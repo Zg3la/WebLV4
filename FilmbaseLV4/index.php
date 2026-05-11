@@ -42,6 +42,7 @@ if ($je_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['akcija'] ?? '
 // ─────────────────────────────────────────────
 if ($je_admin && isset($_GET['brisi'])) {
     $id = (int)$_GET['brisi'];
+
     $stmt = $conn->prepare("DELETE FROM filmovi WHERE id=?");
     $stmt->bind_param("i", $id);
     $stmt->execute();
@@ -87,12 +88,11 @@ if ($prijavljen && isset($_GET['ukloni'])) {
 }
 
 // ─────────────────────────────────────────────
-// FILTER FILMOVA
+// FILTER FILMOVA (OSTAVLJENO JEDNOSTAVNO)
 // ─────────────────────────────────────────────
-$zanr   = trim($_GET['zanr'] ?? '');
+$zanr   = $_GET['zanr'] ?? '';
 $godina = (int)($_GET['godina'] ?? 0);
 $ocjena = (float)($_GET['ocjena'] ?? 0);
-$sort   = $_GET['sort'] ?? 'naslov';
 
 $where = "WHERE 1=1";
 
@@ -100,7 +100,7 @@ if ($zanr)   $where .= " AND zanr LIKE '%$zanr%'";
 if ($godina) $where .= " AND godina >= $godina";
 if ($ocjena) $where .= " AND ocjena >= $ocjena";
 
-$sql = "SELECT * FROM filmovi $where ORDER BY $sort ASC";
+$sql = "SELECT * FROM filmovi $where ORDER BY naslov ASC";
 $filmovi = $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
 
 // ─────────────────────────────────────────────
@@ -134,7 +134,7 @@ if ($prijavljen) {
 <body>
 
 <header id="Naslov">
-    <h1>Filmbase</h1>
+    <h1>Dobrodosli na moju web stranicu</h1>
 </header>
 
 <nav class="navbar">
@@ -143,6 +143,7 @@ if ($prijavljen) {
 
     <div class="nav-links">
         <a href="index.php">Pocetna</a>
+        <a href="grafikon.html">Grafikon</a>
         <a href="galerija.php">Galerija</a>
 
         <?php if ($prijavljen): ?>
@@ -167,7 +168,7 @@ if ($prijavljen) {
     <button>Filter</button>
 </form>
 
-<table>
+<table border="1">
 <tr>
     <th>Naslov</th><th>Žanr</th><th>Godina</th><th>Ocjena</th>
     <?php if ($prijavljen): ?><th>Videoteka</th><?php endif; ?>
