@@ -48,24 +48,31 @@ if ($je_admin && isset($_GET['brisi']) && is_numeric($_GET['brisi'])) {
 
 // ── Dodaj u videoteku (korisnik) ──────────────────────────────────────────
 $poruka_videoteka = '';
-if ($prijavljen && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija']) && $_POST['akcija'] === 'dodaj_u_videoteku') {
+
+if ($prijavljen && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['akcija'] ?? '') === 'dodaj_u_videoteku') {
+
     $film_id = (int)($_POST['film_id'] ?? 0);
+
     if ($film_id > 0) {
-        // Provjeri prosječnu ocjenu filma
+
         $res = $conn->query("SELECT ocjena FROM filmovi WHERE id = $film_id");
         $film_row = $res->fetch_assoc();
         $upozorenje = ($film_row && $film_row['ocjena'] < 5.0);
 
-        $stmt = $conn->prepare("INSERT IGNORE INTO zeljeni_filmovi (korisnik_id, film_id) VALUES (?, ?)");
+        $stmt = $conn->prepare("
+            INSERT IGNORE INTO zeljeni_filmovi (korisnik_id, film_id)
+            VALUES (?, ?)
+        ");
         $stmt->bind_param("ii", $_SESSION['user_id'], $film_id);
         $stmt->execute();
         $stmt->close();
 
-        if ($upozorenje) {
-            $poruka_videoteka = '<div class="alert alert-warn">⚠️ Ovaj film ima nisku ocjenu – jeste li sigurni da ga želite dodati?</div>';
-        } else {
-            $poruka_videoteka = '<div class="alert alert-success">Film dodan u vašu videoteku!</div>';
-        }
+        $_SESSION['poruka_videoteka'] = $upozorenje
+            ? '⚠️ Film ima nisku ocjenu!'
+            : 'Film dodan u videoteku!';
+
+        header("Location: index.php#videoteka");
+        exit;
     }
 }
 
@@ -167,57 +174,7 @@ if ($prijavljen) {
 
 <main>
 
-<!-- ==================== ZADATAK 1 (LV1/LV2): CSV tablica ==================== -->
-<h1 id="tablicatekst">POPIS FILMOVA (iz CSV datoteke)</h1>
-<div class="container">
-    <table id="filmovi-tablica">
-        <thead>
-            <tr>
-                <th>Naslov</th><th>Žanr</th><th>Godina</th>
-                <th>Trajanje (min)</th><th>Ocjena</th><th>Redatelj</th><th>Zemlja</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-</div>
 
-<!-- ==================== ZADATAK 2 (LV2): Filtriranje (JS) ==================== -->
-<h1 id="tablicatekst">FILTRIRANJE FILMOVA</h1>
-<div id="filteri">
-    <label for="filter-zanr">Žanr:</label>
-    <select id="filter-zanr">
-        <option value="">-- Svi žanrovi --</option>
-        <option value="Drama">Drama</option><option value="Crime">Crime</option>
-        <option value="Action">Action</option><option value="Adventure">Adventure</option>
-        <option value="Comedy">Comedy</option><option value="Biography">Biography</option>
-        <option value="Sci-Fi">Sci-Fi</option><option value="Horror">Horror</option>
-        <option value="Animation">Animation</option><option value="Western">Western</option>
-        <option value="Thriller">Thriller</option><option value="War">War</option>
-    </select>
-    <label for="filter-godina">Godina od:</label>
-    <input type="number" id="filter-godina" placeholder="npr. 1990" min="1900" max="2025">
-    <label for="filter-ocjena">Min. ocjena: <span id="ocjena-vrijednost">7.0</span></label>
-    <input type="range" id="filter-ocjena" min="0" max="10" step="0.1" value="7">
-    <button id="primijeni-filtere">Filtriraj</button>
-    <button id="reset-filtere">Poništi filtere</button>
-</div>
-<div class="container" id="filtrirani-container" style="display:none;">
-    <table id="filtriranje-tablica">
-        <thead>
-            <tr>
-                <th>Naslov</th><th>Žanr</th><th>Godina</th>
-                <th>Trajanje (min)</th><th>Ocjena</th><th>Zemlja</th><th>Dodaj</th>
-            </tr>
-        </thead>
-        <tbody id="filtrirani-tbody"></tbody>
-    </table>
-</div>
-<aside id="kosarica">
-    <h2>🎬 Moja košarica <span id="broj-u-kosarica">(0)</span></h2>
-    <ul id="lista-kosarice"></ul>
-    <p id="kosarica-prazna">Košarica je prazna.</p>
-    <button id="potvrdi-kosaricu">✅ Potvrdi posudbu</button>
-</aside>
 
 <!-- ==================== LV4 ZADATAK 1a: Filmovi iz baze ==================== -->
 <section id="filmovi-baza">
