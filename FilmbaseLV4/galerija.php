@@ -138,22 +138,6 @@ if ($prijavljen) {
 
 <?= $poruka ?>
 
-<!-- ── Galerija iz LV1/LV2 (statičke slike) ───────────────────────── -->
-<div class="prvired">
-    <img src="https://pulainfo.hr/wp-content/uploads/2024/03/Kino_Valli_K.jpg" alt="" loading="lazy">
-    <img src="https://www.europeanfilmacademy.org/app/uploads/2024/10/img-3489.jpg" alt="" loading="lazy">
-    <img src="https://dynamic-media-cdn.tripadvisor.com/media/photo-o/12/58/9b/17/photo1jpg.jpg?w=900&h=500&s=1" alt="" loading="lazy">
-</div>
-<div class="drugired">
-    <img src="https://esquire.com.au/wp-content/uploads/2025/01/1500x1000-Template-12.jpg" alt="" loading="lazy">
-    <img src="https://halifax.citynews.ca/wp-content/blogs.dir/sites/5/2025/04/f0e461eb7852bbda45baf331fdbb29bdd3d0896c08a9e40a6fb45a511590c8c7.jpg" loading="lazy" alt="">
-    <img src="https://cdn.moviefone.com/image-assets/83533/bRBeSHfGHwkEpImlhxPmOcUsaeg.jpg?d=360x540&q=80" alt="" loading="lazy">
-</div>
-<div class="trecired">
-    <img src="https://static0.srcdn.com/wordpress/wp-content/uploads/2024/08/2026-big-year-for-animated-movies.jpg" alt="" loading="lazy">
-    <img src="https://images.squarespace-cdn.com/content/v1/5a90557e1137a6fdeeb6bb3e/c7e8b46f-0cbb-4110-a4d5-b5b3acb31caa/hoppers-header.jpg" alt="" loading="lazy">
-    <img src="https://preview.redd.it/2026-is-looking-insane-for-animated-films-could-it-end-up-v0-xky9jywtkfce1.jpg?width=2828&format=pjpg&auto=webp&s=b00ab83f7ebddf9bd23943ef29e45835bc2e0553" alt="" loading="lazy">
-</div>
 
 <!-- ── LV4 Zadatak 2: Ocjenjivanje fotografija ─────────────────────── -->
 <section id="ocjenjivanje">
