@@ -7,57 +7,70 @@ $prijavljen   = isLoggedIn();
 $je_admin     = isAdmin();
 $korisnik_ime = $_SESSION['korisnicko_ime'] ?? '';
 
-// ── Dodaj film u bazu (admin) ──────────────────────────────────────────────
-$poruka_forma = '';
-if ($je_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija']) && $_POST['akcija'] === 'dodaj_film') {
-    $naslov    = trim($_POST['naslov']    ?? '');
-    $zanr      = trim($_POST['zanr']      ?? '');
-    $godina    = (int)($_POST['godina']   ?? 0);
-    $trajanje  = (int)($_POST['trajanje'] ?? 0);
-    $ocjena    = (float)($_POST['ocjena'] ?? 0);
-    $redatelj  = trim($_POST['redatelj']  ?? '');
-    $zemlja    = trim($_POST['zemlja']    ?? '');
+// ─────────────────────────────
+// SESSION PORUKA VIDEOTEKE
+// ─────────────────────────────
+$poruka_videoteka = $_SESSION['poruka_videoteka'] ?? '';
+unset($_SESSION['poruka_videoteka']);
 
-    if (!$naslov || !$zanr || $godina < 1888 || $godina > 2030 || $trajanje < 1 || $trajanje > 600) {
-        $poruka_forma = '<div class="alert alert-error">Neispravni podaci. Provjeri godinu (1888–2030) i trajanje (1–600 min).</div>';
+$poruka_forma = '';
+
+/* ─────────────────────────────
+   DODAJ FILM (ADMIN)
+───────────────────────────── */
+if ($je_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['akcija'] ?? '') === 'dodaj_film') {
+
+    $naslov   = trim($_POST['naslov'] ?? '');
+    $zanr     = trim($_POST['zanr'] ?? '');
+    $godina   = (int)($_POST['godina'] ?? 0);
+    $trajanje = (int)($_POST['trajanje'] ?? 0);
+    $ocjena   = (float)($_POST['ocjena'] ?? 0);
+    $redatelj = trim($_POST['redatelj'] ?? '');
+    $zemlja   = trim($_POST['zemlja'] ?? '');
+
+    if (!$naslov || !$zanr || $godina < 1888 || $godina > 2030) {
+        $poruka_forma = "<div class='alert alert-error'>Neispravni podaci.</div>";
     } else {
-        $stmt = $conn->prepare("INSERT INTO filmovi (naslov, zanr, godina, trajanje_min, ocjena, redatelj, zemlja) VALUES (?,?,?,?,?,?,?)");
-        $stmt->bind_param("ssiiidss", $naslov, $zanr, $godina, $trajanje, $ocjena, $redatelj, $zemlja);
-        // fix bind: ocjena is decimal
-        $stmt = $conn->prepare("INSERT INTO filmovi (naslov, zanr, godina, trajanje_min, ocjena, redatelj, zemlja) VALUES (?,?,?,?,?,?,?)");
+        $stmt = $conn->prepare("
+            INSERT INTO filmovi (naslov, zanr, godina, trajanje_min, ocjena, redatelj, zemlja)
+            VALUES (?,?,?,?,?,?,?)
+        ");
         $stmt->bind_param("ssiidss", $naslov, $zanr, $godina, $trajanje, $ocjena, $redatelj, $zemlja);
-        if ($stmt->execute()) {
-            $poruka_forma = '<div class="alert alert-success">Film uspješno dodan!</div>';
-        } else {
-            $poruka_forma = '<div class="alert alert-error">Greška pri dodavanju filma.</div>';
-        }
+        $stmt->execute();
         $stmt->close();
+
+        $poruka_forma = "<div class='alert alert-success'>Film dodan!</div>";
     }
 }
 
-// ── Briši film (admin) ────────────────────────────────────────────────────
-if ($je_admin && isset($_GET['brisi']) && is_numeric($_GET['brisi'])) {
+/* ─────────────────────────────
+   BRISANJE FILMA (ADMIN)
+───────────────────────────── */
+if ($je_admin && isset($_GET['brisi'])) {
     $id = (int)$_GET['brisi'];
-    $stmt = $conn->prepare("DELETE FROM filmovi WHERE id = ?");
+
+    $stmt = $conn->prepare("DELETE FROM filmovi WHERE id=?");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $stmt->close();
-    header('Location: index.php');
+
+    header("Location: index.php");
     exit;
 }
 
-// ── Dodaj u videoteku (korisnik) ──────────────────────────────────────────
-$poruka_videoteka = '';
-
-if ($prijavljen && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['akcija'] ?? '') === 'dodaj_u_videoteku') {
+/* ─────────────────────────────
+   DODAJ U VIDEOTEKU
+───────────────────────────── */
+if ($prijavljen && ($_POST['akcija'] ?? '') === 'dodaj_u_videoteku') {
 
     $film_id = (int)($_POST['film_id'] ?? 0);
 
     if ($film_id > 0) {
 
-        $res = $conn->query("SELECT ocjena FROM filmovi WHERE id = $film_id");
-        $film_row = $res->fetch_assoc();
-        $upozorenje = ($film_row && $film_row['ocjena'] < 5.0);
+        $res = $conn->query("SELECT ocjena FROM filmovi WHERE id=$film_id");
+        $film = $res->fetch_assoc();
+
+        $upozorenje = ($film && $film['ocjena'] < 5.0);
 
         $stmt = $conn->prepare("
             INSERT IGNORE INTO zeljeni_filmovi (korisnik_id, film_id)
@@ -67,70 +80,61 @@ if ($prijavljen && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['akcija'] ??
         $stmt->execute();
         $stmt->close();
 
-        $_SESSION['poruka_videoteka'] = $upozorenje
-            ? '⚠️ Film ima nisku ocjenu!'
-            : 'Film dodan u videoteku!';
+        $_SESSION['poruka_videoteka'] =
+            $upozorenje ? "⚠️ Film ima nisku ocjenu!" : "Film dodan u videoteku!";
 
         header("Location: index.php#videoteka");
         exit;
     }
 }
 
-// ── Ukloni iz videoteke ───────────────────────────────────────────────────
-if ($prijavljen && isset($_GET['ukloni']) && is_numeric($_GET['ukloni'])) {
+/* ─────────────────────────────
+   UKLONI IZ VIDEOTEKE
+───────────────────────────── */
+if ($prijavljen && isset($_GET['ukloni'])) {
+
     $film_id = (int)$_GET['ukloni'];
-    $stmt = $conn->prepare("DELETE FROM zeljeni_filmovi WHERE korisnik_id = ? AND film_id = ?");
+
+    $stmt = $conn->prepare("
+        DELETE FROM zeljeni_filmovi
+        WHERE korisnik_id=? AND film_id=?
+    ");
     $stmt->bind_param("ii", $_SESSION['user_id'], $film_id);
     $stmt->execute();
     $stmt->close();
-    header('Location: index.php#videoteka');
+
+    header("Location: index.php#videoteka");
     exit;
 }
 
-// ── Filtriranje i prikaz filmova ──────────────────────────────────────────
-$zanr_filter    = trim($_GET['zanr']    ?? '');
-$godina_filter  = (int)($_GET['godina'] ?? 0);
-$ocjena_filter  = isset($_GET['ocjena']) ? (float)$_GET['ocjena'] : 0;
-$sort           = in_array($_GET['sort'] ?? '', ['naslov','godina','ocjena']) ? $_GET['sort'] : 'naslov';
+/* ─────────────────────────────
+   FILTER FILMOVA
+───────────────────────────── */
+$zanr   = trim($_GET['zanr'] ?? '');
+$godina = (int)($_GET['godina'] ?? 0);
+$ocjena = (float)($_GET['ocjena'] ?? 0);
 
-$where = ["1=1"];
-$params = [];
-$types  = "";
+$where = "WHERE 1=1";
 
-if ($zanr_filter) {
-    $where[] = "zanr LIKE ?";
-    $params[] = "%$zanr_filter%";
-    $types .= "s";
-}
-if ($godina_filter > 0) {
-    $where[] = "godina >= ?";
-    $params[] = $godina_filter;
-    $types .= "i";
-}
-if ($ocjena_filter > 0) {
-    $where[] = "ocjena >= ?";
-    $params[] = $ocjena_filter;
-    $types .= "d";
-}
+if ($zanr)   $where .= " AND zanr LIKE '%".$conn->real_escape_string($zanr)."%'";
+if ($godina) $where .= " AND godina >= $godina";
+if ($ocjena) $where .= " AND ocjena >= $ocjena";
 
-$sql = "SELECT * FROM filmovi WHERE " . implode(" AND ", $where) . " ORDER BY $sort ASC";
-$stmt = $conn->prepare($sql);
-if ($params) {
-    $stmt->bind_param($types, ...$params);
-}
-$stmt->execute();
-$filmovi = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+$filmovi = $conn->query("SELECT * FROM filmovi $where ORDER BY naslov ASC")
+                ->fetch_all(MYSQLI_ASSOC);
 
-// ── Moja videoteka ────────────────────────────────────────────────────────
+/* ─────────────────────────────
+   VIDEOTEKA
+───────────────────────────── */
 $moji_filmovi = [];
 $moji_ids = [];
+
 if ($prijavljen) {
     $stmt = $conn->prepare("
-        SELECT f.* FROM filmovi f
-        JOIN zeljeni_filmovi zf ON f.id = zf.film_id
-        WHERE zf.korisnik_id = ?
-        ORDER BY zf.datum_dodavanja DESC
+        SELECT f.*
+        FROM filmovi f
+        JOIN zeljeni_filmovi z ON f.id = z.film_id
+        WHERE z.korisnik_id=?
     ");
     $stmt->bind_param("i", $_SESSION['user_id']);
     $stmt->execute();
@@ -139,183 +143,111 @@ if ($prijavljen) {
     $stmt->close();
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="hr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Filmbase</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/lv4.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<meta charset="UTF-8">
+<title>Filmbase</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/lv4.css">
 </head>
+
 <body>
 
-<header id="Naslov"><h1>Dobrodosli na moju web stranicu</h1></header>
+<header id="Naslov">
+    <h1>Filmbase</h1>
+</header>
 
 <nav class="navbar">
     <input type="checkbox" id="check">
     <label for="check" class="checkbtn">☰</label>
+
     <div class="nav-links">
         <a href="index.php">Pocetna</a>
-        <a href="grafikon.html">Grafikon</a>
+        <a href="grafikon.php">Grafikon</a>
         <a href="galerija.php">Galerija</a>
+
         <?php if ($prijavljen): ?>
-            <?php if ($je_admin): ?>
-                <a href="admin/dashboard.php">Admin</a>
-            <?php endif; ?>
             <a href="logout.php">Odjava (<?= htmlspecialchars($korisnik_ime) ?>)</a>
         <?php else: ?>
-            <a href="login.php">Prijava</a>
-            <a href="registracija.php">Registracija</a>
+            <a href="login.php">Login</a>
         <?php endif; ?>
     </div>
 </nav>
 
 <main>
 
+<h2>🎬 Filmovi</h2>
 
+<?= $poruka_forma ?>
+<?= $poruka_videoteka ?>
 
-<!-- ==================== LV4 ZADATAK 1a: Filmovi iz baze ==================== -->
-<section id="filmovi-baza">
-    <h1 id="tablicatekst">🎬 FILMOVI IZ BAZE PODATAKA (LV4)</h1>
+<form method="GET">
+    <input type="text" name="zanr" placeholder="Žanr">
+    <input type="number" name="godina" placeholder="Godina">
+    <input type="number" step="0.1" name="ocjena" placeholder="Ocjena">
+    <button>Filter</button>
+</form>
 
-    <?= $poruka_forma ?>
-    <?= $poruka_videoteka ?>
+<table border="1" width="100%">
+<tr>
+    <th>Naslov</th>
+    <th>Žanr</th>
+    <th>Godina</th>
+    <th>Ocjena</th>
+    <?php if ($prijavljen): ?><th>Videoteka</th><?php endif; ?>
+    <?php if ($je_admin): ?><th>Brisi</th><?php endif; ?>
+</tr>
 
-    <!-- Filter forma (server-side) -->
-    <form method="GET" action="index.php" id="db-filteri">
-        <div id="filteri">
-            <label>Žanr:</label>
-            <select name="zanr">
-                <option value="">-- Svi žanrovi --</option>
-                <?php foreach (['Drama','Crime','Action','Adventure','Comedy','Biography','Sci-Fi','Horror','Animation','Western','Thriller','War'] as $z): ?>
-                    <option value="<?= $z ?>" <?= $zanr_filter === $z ? 'selected' : '' ?>><?= $z ?></option>
-                <?php endforeach; ?>
-            </select>
-            <label>Godina od:</label>
-            <input type="number" name="godina" value="<?= $godina_filter ?: '' ?>" placeholder="npr. 1990" min="1900" max="2030">
-            <label>Min. ocjena:</label>
-            <input type="number" name="ocjena" value="<?= $ocjena_filter ?: '' ?>" step="0.1" min="0" max="10" placeholder="0–10">
-            <label>Sortiraj po:</label>
-            <select name="sort">
-                <option value="naslov"  <?= $sort==='naslov'  ? 'selected':'' ?>>Naslovu</option>
-                <option value="godina"  <?= $sort==='godina'  ? 'selected':'' ?>>Godini</option>
-                <option value="ocjena"  <?= $sort==='ocjena'  ? 'selected':'' ?>>Ocjeni</option>
-            </select>
-            <button type="submit" id="primijeni-filtere">Filtriraj</button>
-            <a href="index.php" style="margin-left:8px;"><button type="button" id="reset-filtere">Poništi</button></a>
-        </div>
-    </form>
+<?php foreach ($filmovi as $f): ?>
+<tr>
+    <td><?= htmlspecialchars($f['naslov']) ?></td>
+    <td><?= $f['zanr'] ?></td>
+    <td><?= $f['godina'] ?></td>
+    <td><?= $f['ocjena'] ?></td>
 
-    <div class="container">
-        <table id="filtriranje-tablica" style="width:100%">
-            <thead>
-                <tr>
-                    <th>Naslov</th><th>Žanr</th><th>Godina</th>
-                    <th>Trajanje</th><th>Ocjena</th><th>Redatelj</th><th>Zemlja</th>
-                    <?php if ($prijavljen): ?><th>Videoteka</th><?php endif; ?>
-                    <?php if ($je_admin): ?><th>Akcije</th><?php endif; ?>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($filmovi as $film): ?>
-                <tr>
-                    <td><?= htmlspecialchars($film['naslov']) ?></td>
-                    <td><?= htmlspecialchars($film['zanr']) ?></td>
-                    <td><?= $film['godina'] ?></td>
-                    <td><?= $film['trajanje_min'] ?> min</td>
-                    <td><?= number_format($film['ocjena'], 1) ?></td>
-                    <td><?= htmlspecialchars($film['redatelj'] ?? '–') ?></td>
-                    <td><?= htmlspecialchars($film['zemlja'] ?? '–') ?></td>
-                    <?php if ($prijavljen): ?>
-                    <td>
-                        <?php if (in_array($film['id'], $moji_ids)): ?>
-                            <span style="color:green">✓ U videoteci</span>
-                        <?php else: ?>
-                            <form method="POST" style="display:inline">
-                                <input type="hidden" name="akcija" value="dodaj_u_videoteku">
-                                <input type="hidden" name="film_id" value="<?= $film['id'] ?>">
-                                <button type="submit" class="dodaj-btn">+ Dodaj</button>
-                            </form>
-                        <?php endif; ?>
-                    </td>
-                    <?php endif; ?>
-                    <?php if ($je_admin): ?>
-                    <td>
-                        <a href="?brisi=<?= $film['id'] ?>" class="btn-delete"
-                           onclick="return confirm('Obrisati film?')">🗑 Briši</a>
-                    </td>
-                    <?php endif; ?>
-                </tr>
-            <?php endforeach; ?>
-            <?php if (empty($filmovi)): ?>
-                <tr><td colspan="9" style="text-align:center">Nema rezultata.</td></tr>
-            <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
+    <?php if ($prijavljen): ?>
+    <td>
+        <?php if (in_array($f['id'], $moji_ids)): ?>
+            ✔
+        <?php else: ?>
+            <form method="POST">
+                <input type="hidden" name="akcija" value="dodaj_u_videoteku">
+                <input type="hidden" name="film_id" value="<?= $f['id'] ?>">
+                <button>+</button>
+            </form>
+        <?php endif; ?>
+    </td>
+    <?php endif; ?>
 
-    <!-- Admin: Dodaj novi film -->
     <?php if ($je_admin): ?>
-    <div class="admin-forma">
-        <h3>➕ Dodaj novi film</h3>
-        <form method="POST" action="index.php">
-            <input type="hidden" name="akcija" value="dodaj_film">
-            <div class="forma-grid">
-                <div><label>Naslov *</label><input type="text" name="naslov" required maxlength="255"></div>
-                <div><label>Žanr *</label><input type="text" name="zanr" required maxlength="100"></div>
-                <div><label>Godina * (1888–2030)</label><input type="number" name="godina" required min="1888" max="2030"></div>
-                <div><label>Trajanje (min) *</label><input type="number" name="trajanje" required min="1" max="600"></div>
-                <div><label>Ocjena (0–10)</label><input type="number" name="ocjena" step="0.1" min="0" max="10" value="0"></div>
-                <div><label>Redatelj</label><input type="text" name="redatelj" maxlength="150"></div>
-                <div><label>Zemlja</label><input type="text" name="zemlja" maxlength="100"></div>
-            </div>
-            <button type="submit" class="btn-primary">Dodaj film</button>
-        </form>
-    </div>
-    <?php elseif (!$prijavljen): ?>
-    <p style="text-align:center;color:#888;margin:20px">
-        <a href="login.php">Prijavite se</a> kako biste dodali filmove u svoju videoteku.
-    </p>
+    <td>
+        <a href="?brisi=<?= $f['id'] ?>">🗑</a>
+    </td>
     <?php endif; ?>
-</section>
+</tr>
+<?php endforeach; ?>
+</table>
 
-<!-- ==================== LV4: Moja videoteka ==================== -->
 <?php if ($prijavljen): ?>
-<section id="videoteka">
-    <h1 id="tablicatekst">📚 MOJA VIDEOTEKA</h1>
-    <?php if (empty($moji_filmovi)): ?>
-        <p style="text-align:center;color:#888">Vaša videoteka je prazna. Dodajte filmove iz tablice iznad.</p>
-    <?php else: ?>
-    <div class="container">
-        <table id="filtriranje-tablica" style="width:100%">
-            <thead>
-                <tr><th>Naslov</th><th>Žanr</th><th>Godina</th><th>Ocjena</th><th>Ukloni</th></tr>
-            </thead>
-            <tbody>
-            <?php foreach ($moji_filmovi as $film): ?>
-                <tr>
-                    <td><?= htmlspecialchars($film['naslov']) ?></td>
-                    <td><?= htmlspecialchars($film['zanr']) ?></td>
-                    <td><?= $film['godina'] ?></td>
-                    <td><?= number_format($film['ocjena'], 1) ?></td>
-                    <td>
-                        <a href="?ukloni=<?= $film['id'] ?>#videoteka" class="btn-delete"
-                           onclick="return confirm('Ukloniti film iz videoteke?')">✕ Ukloni</a>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php endif; ?>
-</section>
+<h2 id="videoteka">📚 Videoteka</h2>
+
+<table border="1" width="100%">
+<?php foreach ($moji_filmovi as $f): ?>
+<tr>
+    <td><?= $f['naslov'] ?></td>
+    <td><a href="?ukloni=<?= $f['id'] ?>#videoteka">✕</a></td>
+</tr>
+<?php endforeach; ?>
+</table>
 <?php endif; ?>
 
 </main>
 
-<footer><p>&copy; 2025. Web Programiranje. Sva prava pridrzana.</p></footer>
-<script src="js/script.js"></script>
+<footer>
+<p>&copy; 2025 Filmbase</p>
+</footer>
+
 </body>
 </html>
