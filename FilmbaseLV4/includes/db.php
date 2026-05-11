@@ -1,41 +1,26 @@
 <?php
-// ================================
-// DATABASE CONFIG (SAFE & PORTABLE)
-// ================================
 
-// Environment variables (Render / Docker / hosting)
 $db_host = getenv('DB_HOST');
 $db_user = getenv('DB_USER');
 $db_pass = getenv('DB_PASS');
 $db_name = getenv('DB_NAME');
+$db_port = getenv('DB_PORT') ?: 3306;
 
-// Fallback za lokalni razvoj (XAMPP / Linux)
+// fallback samo za lokalni dev
 if (!$db_host) {
-    $db_host = '127.0.0.1'; // BITNO: ne "localhost"
-}
-if (!$db_user) {
+    $db_host = '127.0.0.1';
     $db_user = 'root';
-}
-if ($db_pass === false) {
     $db_pass = '';
-}
-if (!$db_name) {
     $db_name = 'filmbase_lv4';
+    $db_port = 3306;
 }
 
-// ================================
-// MYSQL CONNECTION
-// ================================
+$conn = new mysqli($db_host, $db_user, $db_pass, $db_name, $db_port);
 
-$conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-
-// Connection check
 if ($conn->connect_error) {
-    error_log("DB connection failed: " . $conn->connect_error);
-
+    error_log("DB ERROR: " . $conn->connect_error);
     http_response_code(500);
-    die("Greška pri spajanju na bazu podataka.");
+    die("Database connection failed");
 }
 
-// Charset (obavezno za hrvatske znakove)
 $conn->set_charset("utf8mb4");
