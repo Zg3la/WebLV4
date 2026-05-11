@@ -4,30 +4,35 @@ $db_host = getenv('DB_HOST');
 $db_user = getenv('DB_USER');
 $db_pass = getenv('DB_PASS');
 $db_name = getenv('DB_NAME');
-$db_port = getenv('DB_PORT') ?: 3306;
+$db_port = (int)getenv('DB_PORT');
 
-// Provjera da su varijable postavljene
-if (!$db_host || !$db_user || !$db_name) {
-    error_log("Missing database environment variables.");
-    http_response_code(500);
-    exit("Database configuration error.");
-}
+$conn = mysqli_init();
 
-// Spajanje na remote MySQL
-$conn = new mysqli(
+// Putanja do Aiven certifikata
+$ca_cert = __DIR__ . '/../certs/ca.pem';
+
+mysqli_ssl_set(
+    $conn,
+    null,
+    null,
+    $ca_cert,
+    null,
+    null
+);
+
+$conn->real_connect(
     $db_host,
     $db_user,
     $db_pass,
     $db_name,
-    (int)$db_port
+    $db_port,
+    null,
+    MYSQLI_CLIENT_SSL
 );
 
-// Error handling
 if ($conn->connect_error) {
-    error_log("DB connection failed: " . $conn->connect_error);
-    http_response_code(500);
+    error_log("DB error: " . $conn->connect_error);
     exit("Database connection failed.");
 }
 
-// UTF-8 za hrvatske znakove
 $conn->set_charset("utf8mb4");
