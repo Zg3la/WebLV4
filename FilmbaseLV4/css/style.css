@@ -1,0 +1,377 @@
+body {
+  margin: 0;
+  min-height: 100vh;     
+  display: flex;
+  font-family: Arial, Helvetica, sans-serif;
+  flex-direction: column;
+}
+
+.navbar {
+ background-color: pink;
+ position: relative;
+ display: flex;
+ align-items: center;
+ 
+}
+
+.nav-links {
+  display: flex;
+  gap: 30px;
+}
+
+.nav-links a {
+  color: black;
+  text-decoration: none;
+}
+
+
+.checkbtn {
+  display: none;
+}
+
+#check {
+  display: none;
+}
+main {
+  flex: 1;
+}
+
+#Naslov {
+  background-color:lightcoral;
+  color: white;
+  text-align: center;
+  padding: 20px;
+}
+
+nav {
+  background-color: #555;
+  padding: 10px;
+  text-align: center;
+}
+
+nav a {
+  color: white;
+  text-decoration: none;
+  margin: 0 10px;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+
+#tablicatekst {
+  text-align: center;
+  margin-top: 20px;
+  color: black;
+}
+
+.container {
+  display: flex;
+  justify-content: left;
+  align-items: flex-start;
+  gap: 300px;
+  padding: 20px;
+}
+
+#tablica {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+#tablica th, 
+#tablica td {
+  border: 1px solid #020202;
+  padding: 8px;
+  text-align: center;
+}
+
+#tablica th {
+  background-color: wheat;
+}
+
+
+#sidebar img {
+  width: 500px;
+  height: auto;
+  border-radius: 10px;
+}
+
+main {
+  padding: 20px;
+}
+
+footer {
+  background-color: #333;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  margin-top: 20px;
+}
+img {
+  border-radius: 15px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+img:hover {
+  transform: scale(1.05);
+  transition: 0.3s;
+}
+@media (max-width: 768px) {
+  .checkbtn {
+    display: block;
+    font-size: 28px;
+    color: white;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+  }
+
+  .nav-links {
+    display: none;
+    flex-direction: column;
+    background-color: white;
+    position: absolute;
+    top: 100%;  
+    left: 0;
+    width: 100%;
+    z-index: 1;
+  }
+
+  .nav-links a {
+    padding: 10px;
+    border-bottom: 1px solid black;
+    color: black;
+  }
+
+  #check:checked ~ .nav-links {
+    display: flex;
+  }
+
+
+  .container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #tablica {
+    width: 100%;
+  }
+
+  #sidebar img {
+    width: 60%;
+  }
+
+} 
+
+/* ============================================================
+   LV3 – Dodani stilovi za filtere i košaricu
+   ============================================================ */
+
+/* Sekcija s filterima */
+#filteri {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 20px;
+}
+
+#filteri label {
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+#filteri select,
+#filteri input[type="number"] {
+    padding: 6px 10px;
+    border: 1px solid #bbb;
+    border-radius: 5px;
+    font-size: 0.9rem;
+}
+
+#filteri input[type="range"] {
+    width: 150px;
+    cursor: pointer;
+}
+
+#primijeni-filtere {
+    background-color: lightcoral;
+    color: white;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+
+#primijeni-filtere:hover {
+    background-color: #c0392b;
+}
+
+#reset-filtere {
+    background-color: #aaa;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#reset-filtere:hover {
+    background-color: #888;
+}
+
+/* Tablica filtriranih filmova */
+#filtriranje-tablica {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#filtriranje-tablica th,
+#filtriranje-tablica td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: center;
+}
+
+#filtriranje-tablica th {
+    background-color: lightcoral;
+    color: white;
+}
+
+#filtriranje-tablica tr:hover {
+    background-color: #fff0f0;
+}
+
+.dodaj-btn {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.dodaj-btn:hover {
+    background-color: #1e8449;
+}
+
+/* Košarica – fiksirana sa strane */
+#kosarica {
+    position: fixed;
+    right: 15px;
+    top: 130px;
+    width: 240px;
+    background-color: #fff8f0;
+    border: 2px solid lightcoral;
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    z-index: 999;
+}
+
+#kosarica h2 {
+    font-size: 1rem;
+    margin: 0 0 10px 0;
+    color: #c0392b;
+    border-bottom: 1px solid #f0c0b0;
+    padding-bottom: 8px;
+}
+
+#lista-kosarice {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 10px 0;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+#lista-kosarice li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px dashed #ddd;
+    font-size: 0.82rem;
+}
+
+#lista-kosarice li span {
+    flex: 1;
+    margin-right: 6px;
+}
+
+.ukloni-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ukloni-btn:hover {
+    background: #c0392b;
+}
+
+#kosarica-prazna {
+    font-size: 0.85rem;
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    margin: 5px 0;
+}
+
+#potvrdi-kosaricu {
+    width: 100%;
+    background-color: lightcoral;
+    color: white;
+    border: none;
+    padding: 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 6px;
+    transition: background 0.2s;
+}
+
+#potvrdi-kosaricu:hover {
+    background-color: #c0392b;
+}
+
+/* Filmovi-tablica stil */
+#filmovi-tablica {
+    border-collapse: collapse;
+    width: 100%;
+}
+#filmovi-tablica th,
+#filmovi-tablica td {
+    border: 1px solid #020202;
+    padding: 8px;
+    text-align: center;
+}
+#filmovi-tablica th {
+    background-color: wheat;
+}
+
+/* Responzivno – sakrij košaricu na malom ekranu */
+@media (max-width: 900px) {
+    #kosarica {
+        position: static;
+        width: auto;
+        margin: 20px;
+    }
+}

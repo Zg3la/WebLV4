@@ -1,0 +1,290 @@
+:root{
+    --circumference:100;
+}
+
+
+body {
+  margin: 0;
+  display: flex;
+  font-family: Arial, Helvetica, sans-serif;
+  flex-direction: column;
+}
+
+.navbar {
+ background-color: pink;
+ position: relative;
+ display: flex;
+ align-items: center;
+ 
+}
+
+.nav-links {
+  display: flex;
+  gap: 30px;
+}
+
+.nav-links a {
+  color: black;
+  text-decoration: none;
+}
+
+
+.checkbtn {
+  display: none;
+}
+
+#check {
+  display: none;
+}
+main {
+  flex: 1;
+}
+
+#Naslov {
+  background-color:lightcoral;
+  color: white;
+  text-align: center;
+  padding: 20px;
+}
+
+nav {
+  background-color: #555;
+  padding: 10px;
+  text-align: center;
+}
+
+nav a {
+  color: white;
+  text-decoration: none;
+  margin: 0 10px;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+
+#tablicatekst {
+  text-align: center;
+  margin-top: 20px;
+  color: black;
+}
+
+.container {
+  display: flex;
+  justify-content: left;
+  align-items: flex-start;
+  gap: 300px;
+  padding: 20px;
+}
+
+#tablica {
+  border-collapse: collapse;
+  width: 60%;
+}
+
+#tablica th, 
+#tablica td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: center;
+}
+
+#tablica th {
+  background-color: wheat;
+}
+
+
+#sidebar img {
+  width: 500px;
+  height: auto;
+  border-radius: 10px;
+}
+
+main {
+  padding: 20px;
+}
+
+footer {
+  background-color: #333;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  margin-top: 20px;
+}
+/*Pie Chart*/
+.pie-chart{
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    position: relative;
+    margin-top: 100px;
+    width: 400px;
+    height: 400px;
+
+}
+svg{
+    display: block;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: visible;
+    transform: rotate(-90deg);
+}
+circle{
+    fill: rgba(0,0,0,0);
+    stroke: #ff4081;
+    stroke-dasharray: 0 var(--circumference);
+    stroke-width: 31.85px;
+    animation: pie1 2s  ease forwards;
+}
+.pie1{
+    stroke:#36d8ff;
+    animation-name: pie1;
+}
+.pie2{
+    stroke:#1eaf60;
+    animation-name: pie2;
+}
+.pie3{
+    stroke:#c2540b;
+    animation-name: pie3;
+}
+.pie4{
+    stroke:#3d13b3;
+    animation-name: pie4;
+}
+.pie5{
+    stroke:#e056c2;
+    animation-name: pie5;
+
+}
+.pie6{
+    stroke:chartreuse;
+    animation-name: pie6;
+}
+@keyframes pie1 {
+    100%{
+            stroke-dasharray: 100 var(--circumference);
+
+    }
+}
+@keyframes pie2 {
+    100%{
+            stroke-dasharray: 67 var(--circumference);
+
+    }
+}
+@keyframes pie3 {
+    100%{
+            stroke-dasharray: 55 var(--circumference);
+
+    }
+}
+@keyframes pie4 {
+    100%{
+            stroke-dasharray: 44 var(--circumference);
+
+    }
+}
+@keyframes pie5 {
+    100%{
+            stroke-dasharray: 33 var(--circumference);
+
+    }
+}
+@keyframes pie6 {
+    100%{
+            stroke-dasharray: 22 var(--circumference);
+
+    }
+}
+ul{
+    list-style-type: none;
+    font-weight: bold;
+}
+
+.types > li:nth-of-type(1){
+    color: blueviolet;
+}
+.types > li:nth-of-type(2){
+    color: #e056c2;
+}
+.types > li:nth-of-type(3){
+    color: chartreuse;
+}
+.types > li:nth-of-type(4){
+    color: #c2540b;
+}
+.types > li:nth-of-type(5){
+    color: #1eaf60;
+}
+.types > li:nth-of-type(6){
+    color: #36d8ff;
+}
+.legend{
+    margin: 0 auto;
+    margin-top: 50px;   
+}
+
+
+@media (max-width: 768px) {
+  .checkbtn {
+    display: block;
+    font-size: 28px;
+    color: white;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+  }
+  .pie-chart {
+    width: 250px;
+    height: 250px;
+    margin-top: 50px;
+  }
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .nav-links {
+    display: none;
+    flex-direction: column;
+    background-color: white;
+    position: absolute;
+    top: 100%;  
+    left: 0;
+    width: 100%;
+    z-index: 1;
+  }
+
+  .nav-links a {
+    padding: 10px;
+    border-bottom: 1px solid black;
+    color: black;
+  }
+
+  #check:checked ~ .nav-links {
+    display: flex;
+  }
+
+
+  .container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #tablica {
+    width: 100%;
+  }
+
+  #sidebar img {
+    width: 60%;
+  }
+
+} 
+
+
