@@ -1,137 +1,178 @@
+/* ================= GLOBAL ================= */
 body {
   margin: 0;
-  min-height: 100vh;     
+  min-height: 100vh;
   display: flex;
-  font-family: Arial, Helvetica, sans-serif;
   flex-direction: column;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f5f5f5;
 }
 
+main {
+  flex: 1;
+  padding: 20px;
+}
+
+/* ================= HEADER ================= */
+#Naslov {
+  background-color: lightcoral;
+  color: white;
+  text-align: center;
+  padding: 20px;
+}
+
+/* ================= NAVBAR ================= */
 .navbar {
- background-color: pink;
- position: relative;
- display: flex;
- align-items: center;
- 
+  background-color: pink;
+  display: flex;
+  align-items: center;
+  padding: 10px 20px;
+  position: relative;
 }
 
 .nav-links {
   display: flex;
-  gap: 30px;
+  gap: 20px;
 }
 
 .nav-links a {
   color: black;
   text-decoration: none;
+  font-weight: bold;
 }
 
+.nav-links a:hover {
+  text-decoration: underline;
+}
 
+/* mobile menu */
 .checkbtn {
   display: none;
+  font-size: 28px;
+  cursor: pointer;
 }
 
 #check {
   display: none;
 }
-main {
-  flex: 1;
-}
 
-#Naslov {
-  background-color:lightcoral;
-  color: white;
-  text-align: center;
-  padding: 20px;
-}
-
-nav {
-  background-color: #555;
-  padding: 10px;
-  text-align: center;
-}
-
-nav a {
-  color: white;
-  text-decoration: none;
-  margin: 0 10px;
-}
-
-nav a:hover {
-  text-decoration: underline;
-}
-
-main {
-  padding: 20px;
-}
-
+/* ================= FOOTER ================= */
 footer {
   background-color: #333;
   color: white;
   text-align: center;
   padding: 10px;
-  margin-top: 20px;
 }
 
-.prvired, .drugired, .trecired {
+/* ================= IMAGES (LV1/LV2 GALERIJE) ================= */
+.prvired,
+.drugired,
+.trecired {
   display: flex;
   justify-content: center;
   gap: 20px;
-  margin: 20px;
+  margin: 20px 0;
   flex-wrap: wrap;
 }
 
-.prvired img, .drugired img, .trecired img {
+.prvired img,
+.drugired img,
+.trecired img {
   width: 300px;
   height: auto;
-  object-fit: cover;
-}
-img:hover {
-  transform: scale(1.05);
+  border-radius: 15px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
   transition: 0.3s;
 }
 
-img {
-  border-radius: 15px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+img:hover {
+  transform: scale(1.05);
 }
 
+/* ================= DATABASE TABLE ================= */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+th, td {
+  padding: 10px;
+  border: 1px solid #ddd;
+  text-align: center;
+}
+
+th {
+  background: #eee;
+}
+
+/* ================= GALLERY GRID (DB GALERIJA) ================= */
+.galerija-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.galerija-kartica {
+  background: white;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  text-align: center;
+  transition: 0.3s;
+}
+
+.galerija-kartica:hover {
+  transform: scale(1.03);
+}
+
+.galerija-kartica img {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+}
+
+/* ================= STARS ================= */
+.zvjezdica {
+  color: #ccc;
+  font-size: 18px;
+}
+
+.zvjezdica.puna {
+  color: gold;
+}
+
+/* ================= MOBILE ================= */
 @media (max-width: 768px) {
+
   .checkbtn {
     display: block;
-    font-size: 28px;
-    color: white;
-    cursor: pointer;
-    position: relative;
-    z-index: 2;
+    color: black;
   }
 
   .nav-links {
     display: none;
     flex-direction: column;
-    background-color: white;
+    background: white;
     position: absolute;
-    top: 100%;  
+    top: 100%;
     left: 0;
     width: 100%;
-    z-index: 1;
+    border-top: 1px solid #ccc;
   }
 
   .nav-links a {
     padding: 10px;
-    border-bottom: 1px solid black;
-    color: black;
+    border-bottom: 1px solid #ddd;
   }
 
   #check:checked ~ .nav-links {
     display: flex;
   }
 
-
- 
-  .prvired img, .drugired img, .trecired img {
+  .prvired img,
+  .drugired img,
+  .trecired img {
     width: 90%;
-    height: auto;
-    flex-direction: column;
-    align-items: center;
   }
-
-} 
+}
