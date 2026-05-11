@@ -6,21 +6,28 @@ $db_pass = getenv('DB_PASS');
 $db_name = getenv('DB_NAME');
 $db_port = getenv('DB_PORT') ?: 3306;
 
-// fallback samo za lokalni dev
-if (!$db_host) {
-    $db_host = '127.0.0.1';
-    $db_user = 'root';
-    $db_pass = '';
-    $db_name = 'filmbase_lv4';
-    $db_port = 3306;
-}
-
-$conn = new mysqli($db_host, $db_user, $db_pass, $db_name, $db_port);
-
-if ($conn->connect_error) {
-    error_log("DB ERROR: " . $conn->connect_error);
+// Provjera da su varijable postavljene
+if (!$db_host || !$db_user || !$db_name) {
+    error_log("Missing database environment variables.");
     http_response_code(500);
-    die("Database connection failed");
+    exit("Database configuration error.");
 }
 
+// Spajanje na remote MySQL
+$conn = new mysqli(
+    $db_host,
+    $db_user,
+    $db_pass,
+    $db_name,
+    (int)$db_port
+);
+
+// Error handling
+if ($conn->connect_error) {
+    error_log("DB connection failed: " . $conn->connect_error);
+    http_response_code(500);
+    exit("Database connection failed.");
+}
+
+// UTF-8 za hrvatske znakove
 $conn->set_charset("utf8mb4");
