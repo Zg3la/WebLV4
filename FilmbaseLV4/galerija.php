@@ -156,17 +156,20 @@ if ($prijavljen) {
             <!-- Interaktivne zvjezdice (samo prijavljeni) -->
             <?php if ($prijavljen): ?>
             <div class="ocjeni-blok">
-                <span class="ocjeni-label">Vaša ocjena:</span>
+                <span class="ocjeni-label">Vaša ocjena</span>
                 <div class="zvjezdice-row" id="zvjezdice-<?= $slika['id'] ?>" data-slika="<?= $slika['id'] ?>" data-moja="<?= $moja ?>">
                     <?php for ($i = 1; $i <= 5; $i++): ?>
                         <span class="zvj-input <?= $i <= $moja ? 'aktivna' : '' ?>" data-val="<?= $i ?>">★</span>
                     <?php endfor; ?>
                 </div>
-                <?php if ($moja): ?>
-                    <button class="makni-btn" id="makni-<?= $slika['id'] ?>" data-slika="<?= $slika['id'] ?>">✕ Makni ocjenu</button>
-                <?php else: ?>
-                    <button class="makni-btn" id="makni-<?= $slika['id'] ?>" data-slika="<?= $slika['id'] ?>" style="display:none">✕ Makni ocjenu</button>
-                <?php endif; ?>
+                <span class="ocjeni-hint" id="hint-<?= $slika['id'] ?>"><?= $moja ? '' : 'Klikni za ocjenu' ?></span>
+                <div class="ocjena-status" id="status-<?= $slika['id'] ?>">
+                    <?php if ($moja): ?>
+                        <span class="ocjena-broj"><?= $moja ?></span>
+                        <span>od 5 zvjezdica</span>
+                        <button class="makni-btn" id="makni-<?= $slika['id'] ?>" data-slika="<?= $slika['id'] ?>">ukloni</button>
+                    <?php endif; ?>
+                </div>
             </div>
             <?php endif; ?>
 
@@ -207,63 +210,79 @@ document.querySelectorAll('.zvjezdice-row').forEach(function(row) {
     var zvjezdice = Array.from(row.querySelectorAll('.zvj-input'));
     var idSlike   = parseInt(row.dataset.slika);
     var trenutna  = parseInt(row.dataset.moja) || 0;
-    var makniBtn  = document.getElementById('makni-' + idSlike);
+    var hintEl    = document.getElementById('hint-' + idSlike);
+    var statusEl  = document.getElementById('status-' + idSlike);
 
-    function bojaj(n) {
+    var hintTeksti = ['', 'Loše', 'Osrednje', 'Dobro', 'Vrlo dobro', 'Odlično'];
+
+    function bojaj(n, cssClass) {
         zvjezdice.forEach(function(z, i) {
-            z.classList.toggle('aktivna', i < n);
+            z.classList.toggle(cssClass, i < n);
         });
     }
 
-    // Hover – oboji privremeno
+    // Hover – highlight do hovered zvjezdice
     zvjezdice.forEach(function(z) {
         z.addEventListener('mouseenter', function() {
-            bojaj(parseInt(z.dataset.val));
+            // ukloni aktivna privremeno da hover bude čist
+            bojaj(0, 'aktivna');
+            bojaj(parseInt(z.dataset.val), 'hover-active');
+            if (hintEl) hintEl.textContent = hintTeksti[parseInt(z.dataset.val)];
+        });
+        z.addEventListener('mouseleave', function() {
+            bojaj(0, 'hover-active');
+            bojaj(trenutna, 'aktivna');
+            if (hintEl) hintEl.textContent = trenutna ? '' : 'Klikni za ocjenu';
         });
     });
 
-    // Miš izašao iz reda – vrati na odabranu
-    row.addEventListener('mouseleave', function() {
-        bojaj(trenutna);
-    });
-
-    // Klik – spremi ocjenu
+    // Klik – spremi
     zvjezdice.forEach(function(z) {
         z.addEventListener('click', async function() {
             var nova = parseInt(z.dataset.val);
             trenutna = nova;
             row.dataset.moja = nova;
-            bojaj(nova);
+            bojaj(0, 'hover-active');
+            bojaj(nova, 'aktivna');
+            if (hintEl) hintEl.textContent = '';
 
             var fd = new FormData();
-            fd.append('akcija',   'ocijeni');
+            fd.append('akcija', 'ocijeni');
             fd.append('id_slika', idSlike);
-            fd.append('ocjena',   nova);
+            fd.append('ocjena', nova);
             var data = await posalji(fd);
             azurirajAvg(idSlike, data);
-            if (makniBtn) makniBtn.style.display = 'inline-block';
+            renderStatus(idSlike, nova, statusEl);
         });
     });
 
-    // Makni ocjenu
-    if (makniBtn) {
-        makniBtn.addEventListener('click', async function() {
-            trenutna = 0;
-            row.dataset.moja = 0;
-            bojaj(0);
+    // Makni – event delegation na statusEl jer se gumb dynamički renderira
+    statusEl.addEventListener('click', async function(e) {
+        if (!e.target.classList.contains('makni-btn')) return;
+        trenutna = 0;
+        row.dataset.moja = 0;
+        bojaj(0, 'aktivna');
+        bojaj(0, 'hover-active');
+        if (hintEl) hintEl.textContent = 'Klikni za ocjenu';
 
-            var fd = new FormData();
-            fd.append('akcija',   'makni_ocjenu');
-            fd.append('id_slika', idSlike);
-            var data = await posalji(fd);
-            azurirajAvg(idSlike, data);
-            makniBtn.style.display = 'none';
-        });
-    }
+        var fd = new FormData();
+        fd.append('akcija', 'makni_ocjenu');
+        fd.append('id_slika', idSlike);
+        var data = await posalji(fd);
+        azurirajAvg(idSlike, data);
+        statusEl.innerHTML = '';
+    });
 });
 
+function renderStatus(idSlike, ocjena, statusEl) {
+    statusEl.innerHTML =
+        '<span class="ocjena-broj">' + ocjena + '</span>' +
+        '<span>od 5 zvjezdica</span>' +
+        '<button class="makni-btn" data-slika="' + idSlike + '">ukloni</button>';
+}
+
 async function posalji(fd) {
-    var res  = await fetch('galerija.php', { method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'} });
+    var res = await fetch('galerija.php', { method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'} });
     return res.json();
 }
 
