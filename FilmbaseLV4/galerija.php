@@ -10,20 +10,16 @@ $poruka     = '';
 // ── Admin: upload slike ───────────────────────────────────────────────────
 if ($je_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija']) && $_POST['akcija'] === 'dodaj_sliku') {
     $opis = trim($_POST['opis'] ?? '');
-
     if (!empty($_POST['url_slike'])) {
-        $url = trim($_POST['url_slike']);
+        $url   = trim($_POST['url_slike']);
         $naziv = basename(parse_url($url, PHP_URL_PATH)) ?: 'slika_' . time();
-        $stmt = $conn->prepare("INSERT INTO slike (naziv_datoteke, opis, putanja, izvor) VALUES (?,?,?,'url')");
+        $stmt  = $conn->prepare("INSERT INTO slike (naziv_datoteke, opis, putanja, izvor) VALUES (?,?,?,'url')");
         $stmt->bind_param("sss", $naziv, $opis, $url);
-        if ($stmt->execute()) {
-            $poruka = '<div class="alert alert-success">Slika dodana!</div>';
-        }
+        $poruka = $stmt->execute() ? '<div class="alert alert-success">Slika dodana!</div>' : '<div class="alert alert-error">Greška.</div>';
         $stmt->close();
     } elseif (isset($_FILES['slika']) && $_FILES['slika']['error'] === UPLOAD_ERR_OK) {
-        $allowed = ['image/jpeg', 'image/png'];
+        $allowed  = ['image/jpeg','image/png'];
         $max_size = 5 * 1024 * 1024;
-
         if (!in_array($_FILES['slika']['type'], $allowed)) {
             $poruka = '<div class="alert alert-error">Dopušteni su samo JPEG i PNG formati.</div>';
         } elseif ($_FILES['slika']['size'] > $max_size) {
@@ -35,9 +31,7 @@ if ($je_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija']
                 $putanja = 'slike/' . $naziv;
                 $stmt = $conn->prepare("INSERT INTO slike (naziv_datoteke, opis, putanja, izvor) VALUES (?,?,?,'lokalno')");
                 $stmt->bind_param("sss", $naziv, $opis, $putanja);
-                if ($stmt->execute()) {
-                    $poruka = '<div class="alert alert-success">Slika uploadana!</div>';
-                }
+                $poruka = $stmt->execute() ? '<div class="alert alert-success">Slika uploadana!</div>' : '<div class="alert alert-error">Greška.</div>';
                 $stmt->close();
             }
         }
@@ -51,55 +45,48 @@ if ($je_admin && isset($_GET['brisi_sliku']) && is_numeric($_GET['brisi_sliku'])
     $id = (int)$_GET['brisi_sliku'];
     $conn->query("DELETE FROM ocjene WHERE id_slika = $id");
     $conn->query("DELETE FROM slike WHERE id = $id");
-    header('Location: galerija.php');
+    header('Location: galerija.php'); exit;
+}
+
+// ── AJAX: ocijeni / makni ocjenu ──────────────────────────────────────────
+if ($prijavljen && $_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+    $akcija   = $_POST['akcija']   ?? '';
+    $id_slika = (int)($_POST['id_slika'] ?? 0);
+
+    if ($akcija === 'ocijeni' && $id_slika > 0) {
+        $ocjena = (int)($_POST['ocjena'] ?? 0);
+        if ($ocjena >= 1 && $ocjena <= 5) {
+            $stmt = $conn->prepare("INSERT INTO ocjene (id_korisnik, id_slika, ocjena) VALUES (?,?,?) ON DUPLICATE KEY UPDATE ocjena=VALUES(ocjena), vrijeme_ocjene=NOW()");
+            $stmt->bind_param("iii", $_SESSION['user_id'], $id_slika, $ocjena);
+            $stmt->execute(); $stmt->close();
+        }
+    } elseif ($akcija === 'makni_ocjenu' && $id_slika > 0) {
+        $stmt = $conn->prepare("DELETE FROM ocjene WHERE id_korisnik=? AND id_slika=?");
+        $stmt->bind_param("ii", $_SESSION['user_id'], $id_slika);
+        $stmt->execute(); $stmt->close();
+    }
+
+    // Vrati ažurirane podatke
+    $res = $conn->query("SELECT ROUND(AVG(ocjena),1) AS avg_o, COUNT(*) AS cnt FROM ocjene WHERE id_slika=$id_slika");
+    $row = $res->fetch_assoc();
+    // Provjeri ima li user još ocjenu
+    $res2 = $conn->query("SELECT ocjena FROM ocjene WHERE id_korisnik={$_SESSION['user_id']} AND id_slika=$id_slika");
+    $moja = $res2->num_rows ? (int)$res2->fetch_assoc()['ocjena'] : 0;
+    echo json_encode(['avg' => (float)($row['avg_o'] ?? 0), 'cnt' => (int)$row['cnt'], 'moja' => $moja]);
     exit;
 }
 
-// ── Ocjeni sliku (AJAX) ────────────────────────────────────────────────────
-if ($prijavljen && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija']) && $_POST['akcija'] === 'ocijeni') {
-    $id_slika = (int)($_POST['id_slika'] ?? 0);
-    $ocjena   = (int)($_POST['ocjena']   ?? 0);
-
-    if ($id_slika > 0 && $ocjena >= 1 && $ocjena <= 5) {
-        $stmt = $conn->prepare("
-            INSERT INTO ocjene (id_korisnik, id_slika, ocjena)
-            VALUES (?, ?, ?)
-            ON DUPLICATE KEY UPDATE ocjena = VALUES(ocjena), vrijeme_ocjene = NOW()
-        ");
-        $stmt->bind_param("iii", $_SESSION['user_id'], $id_slika, $ocjena);
-        $stmt->execute();
-        $stmt->close();
-
-        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-            $res = $conn->query("SELECT AVG(ocjena) as avg_o, COUNT(*) as cnt FROM ocjene WHERE id_slika = $id_slika");
-            $row = $res->fetch_assoc();
-            echo json_encode(['avg' => round($row['avg_o'], 1), 'cnt' => $row['cnt']]);
-            exit;
-        }
-
-        header('Location: galerija.php');
-        exit;
-    }
-}
-
-// ── Dohvati sve slike s prosječnim ocjenama ───────────────────────────────
-$slike_result = $conn->query("
-    SELECT s.*, 
-           ROUND(AVG(o.ocjena), 1) AS avg_ocjena,
-           COUNT(o.id) AS broj_ocjena
-    FROM slike s
-    LEFT JOIN ocjene o ON s.id = o.id_slika
-    GROUP BY s.id
-    ORDER BY s.datum_dodavanja DESC
-");
-$slike = $slike_result->fetch_all(MYSQLI_ASSOC);
+// ── Dohvati slike ─────────────────────────────────────────────────────────
+$slike = $conn->query("
+    SELECT s.*, ROUND(AVG(o.ocjena),1) AS avg_ocjena, COUNT(o.id) AS broj_ocjena
+    FROM slike s LEFT JOIN ocjene o ON s.id=o.id_slika
+    GROUP BY s.id ORDER BY s.datum_dodavanja DESC
+")->fetch_all(MYSQLI_ASSOC);
 
 $moje_ocjene = [];
 if ($prijavljen) {
-    $res = $conn->query("SELECT id_slika, ocjena FROM ocjene WHERE id_korisnik = {$_SESSION['user_id']}");
-    while ($row = $res->fetch_assoc()) {
-        $moje_ocjene[$row['id_slika']] = $row['ocjena'];
-    }
+    $res = $conn->query("SELECT id_slika, ocjena FROM ocjene WHERE id_korisnik={$_SESSION['user_id']}");
+    while ($r = $res->fetch_assoc()) $moje_ocjene[$r['id_slika']] = (int)$r['ocjena'];
 }
 ?>
 <!DOCTYPE html>
@@ -130,21 +117,22 @@ if ($prijavljen) {
 </nav>
 
 <main>
-
 <?= $poruka ?>
 
 <section id="ocjenjivanje">
-    <h1 style="text-align:center;margin-top:40px">⭐ OCJENJIVANJE FOTOGRAFIJA (LV4)</h1>
+    <h1 class="section-title">⭐ OCJENJIVANJE FOTOGRAFIJA (LV4)</h1>
 
     <?php if (!$prijavljen): ?>
-        <p style="text-align:center;color:#888">
-            <a href="login.php">Prijavite se</a> kako biste mogli ocjenjivati fotografije.
-        </p>
+        <p class="info-tekst"><a href="login.php">Prijavite se</a> kako biste mogli ocjenjivati fotografije.</p>
     <?php endif; ?>
 
     <div class="galerija-grid">
-        <?php foreach ($slike as $slika): ?>
-        <div class="galerija-kartica" id="slika-<?= $slika['id'] ?>">
+    <?php foreach ($slike as $slika):
+        $avg  = (float)($slika['avg_ocjena'] ?? 0);
+        $cnt  = (int)$slika['broj_ocjena'];
+        $moja = $moje_ocjene[$slika['id']] ?? 0;
+    ?>
+        <div class="galerija-kartica" id="kartica-<?= $slika['id'] ?>">
             <img src="<?= htmlspecialchars($slika['putanja']) ?>"
                  alt="<?= htmlspecialchars($slika['opis'] ?? '') ?>"
                  loading="lazy">
@@ -153,138 +141,139 @@ if ($prijavljen) {
                 <p class="slika-opis"><?= htmlspecialchars($slika['opis']) ?></p>
             <?php endif; ?>
 
-            <!-- Prosječna ocjena -->
-            <div class="avg-ocjena">
-                <?php
-                $avg = $slika['avg_ocjena'] ?? 0;
-                $cnt = $slika['broj_ocjena'];
-                for ($i = 1; $i <= 5; $i++):
-                    $filled = $i <= round($avg);
-                ?>
-                    <span class="zvjezdica <?= $filled ? 'puna' : '' ?>">★</span>
-                <?php endfor; ?>
-                <span class="avg-tekst" id="avg-<?= $slika['id'] ?>">
-                    <?= $avg ? $avg . ' / 5' : 'Nema ocjena' ?> 
-                    (<?= $cnt ?> <?= $cnt === 1 ? 'ocjena' : 'ocjena' ?>)
+            <!-- Prosječna ocjena (readonly) -->
+            <div class="avg-blok">
+                <div class="avg-zvjezdice" id="avg-zvjezdice-<?= $slika['id'] ?>">
+                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                        <span class="zvj <?= $i <= round($avg) ? 'puna' : '' ?>">★</span>
+                    <?php endfor; ?>
+                </div>
+                <span class="avg-tekst" id="avg-tekst-<?= $slika['id'] ?>">
+                    <?= $avg ? $avg . ' / 5' : 'Nema ocjena' ?> (<?= $cnt ?>)
                 </span>
             </div>
 
-            <!-- Forma za ocjenjivanje (samo prijavljeni) -->
+            <!-- Interaktivne zvjezdice (samo prijavljeni) -->
             <?php if ($prijavljen): ?>
-            <div class="ocjeni-forma">
-                <span>Vaša ocjena:</span>
-                <div class="zvjezdice-wrapper" data-slika="<?= $slika['id'] ?>" data-odabrana="<?= $moje_ocjene[$slika['id']] ?? 0 ?>">
-                    <?php $moja = $moje_ocjene[$slika['id']] ?? 0; ?>
+            <div class="ocjeni-blok">
+                <span class="ocjeni-label">Vaša ocjena:</span>
+                <div class="zvjezdice-row" id="zvjezdice-<?= $slika['id'] ?>" data-slika="<?= $slika['id'] ?>" data-moja="<?= $moja ?>">
                     <?php for ($i = 1; $i <= 5; $i++): ?>
-                        <span class="zvjezdica-input <?= $i <= $moja ? 'odabrana' : '' ?>"
-                              data-slika="<?= $slika['id'] ?>"
-                              data-ocjena="<?= $i ?>"
-                              title="<?= $i ?> zvjezdic<?= $i === 1 ? 'a' : 'e' ?>">★</span>
+                        <span class="zvj-input <?= $i <= $moja ? 'aktivna' : '' ?>" data-val="<?= $i ?>">★</span>
                     <?php endfor; ?>
                 </div>
                 <?php if ($moja): ?>
-                    <span class="moja-ocjena-tekst" id="moja-ocjena-<?= $slika['id'] ?>">Vaša: <?= $moja ?>/5</span>
+                    <button class="makni-btn" id="makni-<?= $slika['id'] ?>" data-slika="<?= $slika['id'] ?>">✕ Makni ocjenu</button>
                 <?php else: ?>
-                    <span class="moja-ocjena-tekst" id="moja-ocjena-<?= $slika['id'] ?>"></span>
+                    <button class="makni-btn" id="makni-<?= $slika['id'] ?>" data-slika="<?= $slika['id'] ?>" style="display:none">✕ Makni ocjenu</button>
                 <?php endif; ?>
             </div>
             <?php endif; ?>
 
-            <!-- Admin: briši sliku -->
             <?php if ($je_admin): ?>
-            <div style="text-align:center;margin-top:6px">
-                <a href="galerija.php?brisi_sliku=<?= $slika['id'] ?>"
-                   class="btn-delete" onclick="return confirm('Obrisati sliku?')">🗑 Briši</a>
+            <div class="admin-akcije">
+                <a href="galerija.php?brisi_sliku=<?= $slika['id'] ?>" class="btn-delete"
+                   onclick="return confirm('Obrisati sliku?')">🗑 Briši</a>
             </div>
             <?php endif; ?>
         </div>
-        <?php endforeach; ?>
+    <?php endforeach; ?>
 
-        <?php if (empty($slike)): ?>
-            <p style="grid-column:1/-1;text-align:center;color:#888">Nema slika u galeriji.</p>
-        <?php endif; ?>
+    <?php if (empty($slike)): ?>
+        <p style="grid-column:1/-1;text-align:center;color:#888">Nema slika u galeriji.</p>
+    <?php endif; ?>
     </div>
 
-    <!-- Admin: dodaj sliku -->
     <?php if ($je_admin): ?>
-    <div class="admin-forma" style="max-width:600px;margin:30px auto">
+    <div class="admin-forma">
         <h3>➕ Dodaj sliku u galeriju</h3>
         <form method="POST" action="galerija.php" enctype="multipart/form-data">
             <input type="hidden" name="akcija" value="dodaj_sliku">
-            <div class="forma-grid" style="grid-template-columns:1fr">
-                <div>
-                    <label>URL slike (ili uploadaj ispod)</label>
-                    <input type="url" name="url_slike" placeholder="https://...">
-                </div>
-                <div>
-                    <label>Upload slike (JPEG/PNG, max 5MB)</label>
-                    <input type="file" name="slika" accept="image/jpeg,image/png">
-                </div>
-                <div>
-                    <label>Opis</label>
-                    <input type="text" name="opis" maxlength="500">
-                </div>
+            <div class="forma-grid">
+                <div><label>URL slike</label><input type="url" name="url_slike" placeholder="https://..."></div>
+                <div><label>Upload (JPEG/PNG, max 5MB)</label><input type="file" name="slika" accept="image/jpeg,image/png"></div>
+                <div><label>Opis</label><input type="text" name="opis" maxlength="500"></div>
             </div>
             <button type="submit" class="btn-primary">Dodaj sliku</button>
         </form>
     </div>
     <?php endif; ?>
 </section>
-
 </main>
 <footer><p>&copy; 2025. Web Programiranje. Sva prava pridrzana.</p></footer>
 
 <script>
-document.querySelectorAll('.zvjezdice-wrapper').forEach(function(wrapper) {
-    const zvjezdice = Array.from(wrapper.querySelectorAll('.zvjezdica-input'));
-    const idSlike   = parseInt(wrapper.dataset.slika);
-    let odabrana    = parseInt(wrapper.dataset.odabrana) || 0;
+document.querySelectorAll('.zvjezdice-row').forEach(function(row) {
+    var zvjezdice = Array.from(row.querySelectorAll('.zvj-input'));
+    var idSlike   = parseInt(row.dataset.slika);
+    var trenutna  = parseInt(row.dataset.moja) || 0;
+    var makniBtn  = document.getElementById('makni-' + idSlike);
 
-    function paint(n, cls) {
-        zvjezdice.forEach(function(z, i) { z.classList.toggle(cls, i < n); });
+    function bojaj(n) {
+        zvjezdice.forEach(function(z, i) {
+            z.classList.toggle('aktivna', i < n);
+        });
     }
 
-    wrapper.addEventListener('mousemove', function(e) {
-        const z = e.target.closest('.zvjezdica-input');
-        if (!z) return;
-        paint(0, 'odabrana');
-        paint(parseInt(z.dataset.ocjena), 'hover');
+    // Hover – oboji privremeno
+    zvjezdice.forEach(function(z) {
+        z.addEventListener('mouseenter', function() {
+            bojaj(parseInt(z.dataset.val));
+        });
     });
 
-    wrapper.addEventListener('mouseleave', function() {
-        paint(0, 'hover');
-        paint(odabrana, 'odabrana');
+    // Miš izašao iz reda – vrati na odabranu
+    row.addEventListener('mouseleave', function() {
+        bojaj(trenutna);
     });
 
-    wrapper.addEventListener('click', async function(e) {
-        const z = e.target.closest('.zvjezdica-input');
-        if (!z) return;
-        const novaOcjena = parseInt(z.dataset.ocjena);
-        odabrana = novaOcjena;
-        wrapper.dataset.odabrana = novaOcjena;
-        paint(0, 'hover');
-        paint(odabrana, 'odabrana');
+    // Klik – spremi ocjenu
+    zvjezdice.forEach(function(z) {
+        z.addEventListener('click', async function() {
+            var nova = parseInt(z.dataset.val);
+            trenutna = nova;
+            row.dataset.moja = nova;
+            bojaj(nova);
 
-        const fd = new FormData();
-        fd.append('akcija',   'ocijeni');
-        fd.append('id_slika', idSlike);
-        fd.append('ocjena',   novaOcjena);
-        try {
-            const res  = await fetch('galerija.php', { method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'} });
-            const data = await res.json();
-            const avgEl = document.getElementById('avg-' + idSlike);
-            if (avgEl) avgEl.textContent = data.avg + ' / 5 (' + data.cnt + ' ocjena)';
-            const kartica = document.getElementById('slika-' + idSlike);
-            if (kartica) {
-                const avgZvj = kartica.querySelectorAll('.avg-ocjena .zvjezdica');
-                const rounded = Math.round(data.avg);
-                avgZvj.forEach(function(z, i) { z.classList.toggle('puna', i < rounded); });
-            }
-            const mojaEl = document.getElementById('moja-ocjena-' + idSlike);
-            if (mojaEl) mojaEl.textContent = 'Vaša: ' + novaOcjena + '/5';
-        } catch(e) { console.error(e); }
+            var fd = new FormData();
+            fd.append('akcija',   'ocijeni');
+            fd.append('id_slika', idSlike);
+            fd.append('ocjena',   nova);
+            var data = await posalji(fd);
+            azurirajAvg(idSlike, data);
+            if (makniBtn) makniBtn.style.display = 'inline-block';
+        });
     });
+
+    // Makni ocjenu
+    if (makniBtn) {
+        makniBtn.addEventListener('click', async function() {
+            trenutna = 0;
+            row.dataset.moja = 0;
+            bojaj(0);
+
+            var fd = new FormData();
+            fd.append('akcija',   'makni_ocjenu');
+            fd.append('id_slika', idSlike);
+            var data = await posalji(fd);
+            azurirajAvg(idSlike, data);
+            makniBtn.style.display = 'none';
+        });
+    }
 });
+
+async function posalji(fd) {
+    var res  = await fetch('galerija.php', { method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'} });
+    return res.json();
+}
+
+function azurirajAvg(idSlike, data) {
+    var avgTekst = document.getElementById('avg-tekst-' + idSlike);
+    if (avgTekst) avgTekst.textContent = (data.avg ? data.avg + ' / 5' : 'Nema ocjena') + ' (' + data.cnt + ')';
+    var avgZvj = document.querySelectorAll('#avg-zvjezdice-' + idSlike + ' .zvj');
+    var rounded = Math.round(data.avg);
+    avgZvj.forEach(function(z, i) { z.classList.toggle('puna', i < rounded); });
+}
 </script>
 </body>
 </html>
