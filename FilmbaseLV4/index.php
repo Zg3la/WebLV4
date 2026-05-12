@@ -74,7 +74,7 @@ if ($prijavljen && isset($_GET['dodaj_videoteka']) && is_numeric($_GET['dodaj_vi
                 <div style="border: 2px solid #c0392b; background-color: #fadbd8; padding: 20px; margin-bottom: 20px; border-radius: 8px; color: #78281f; text-align: center;">
                     <h3 style="margin-top: 0; color: #c0392b;">⚠️ Upozorenje: Film ima nisku ocjenu!</h3>
                     <p style="font-size: 16px;">Film <strong>' . htmlspecialchars($odabrani_film['naslov']) . '</strong> ima prosječnu ocjenu ispod 5.0 (' . number_format($odabrani_film['ocjena'], 1) . ').</p>
-                    <p style="font-size: 15px; margin-bottom: 15px;">Ovaj film ima nisku ocjenu - jeste li sigurni da ga želite dodati?</p>
+                    <p style="font-size: 15px; margin-bottom: 15px;">Ovaj film ima nisku ocjenu – jeste li sigurni da ga želite dodati?</p>
                     <div>
                         <a href="index.php?dodaj_videoteka=' . $film_id . '&potvrdeno=1" style="background-color: #c0392b; color: white; padding: 8px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Da, siguran sam</a>
                         <a href="index.php" style="background-color: #7f8c8d; color: white; padding: 8px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; margin-left: 10px;">Odustani</a>
@@ -455,6 +455,7 @@ $stmt->close();
     <h1 id="tablicatekst">🎬 FILMOVI IZ BAZE PODATAKA (LV4)</h1>
 
     <?= $upozorenje_niskocjena ?>
+    <div id="upozorenje-posudba-kontejner"></div>
     <?= $poruka_forma ?>
     <?= $poruka_videoteka ?>
 
@@ -508,7 +509,8 @@ $stmt->close();
                             data-id="<?= $film['id'] ?>"
                             data-naslov="<?= htmlspecialchars($film['naslov'], ENT_QUOTES) ?>"
                             data-zanr="<?= htmlspecialchars($film['zanr'], ENT_QUOTES) ?>"
-                            data-godina="<?= $film['godina'] ?>">
+                            data-godina="<?= $film['godina'] ?>"
+                            data-ocjena="<?= $film['ocjena'] ?>">
                             🛒 Dodaj
                         </button>
                     </td>
@@ -590,7 +592,7 @@ const KORISNIK_PRIJAVLJEN = <?= $prijavljen ? 'true' : 'false' ?>;
 })();
 
 // ════════════════════════════════════════════════════
-//  KOŠARICA – floating aside (Desno)
+//  KOŠARICA – floating aside (Desno) + Upozorenje ocjene
 // ════════════════════════════════════════════════════
 (function () {
     const aside  = document.getElementById('kosarica-aside');
@@ -652,15 +654,52 @@ const KORISNIK_PRIJAVLJEN = <?= $prijavljen ? 'true' : 'false' ?>;
         render();
     });
 
-    // ── Dodaj iz tablice ─────────────────────────────
+    // Pomoćna funkcija za konačno dodavanje u posudbu
+    function izvrsiDodavanjeUPosudbu(btn) {
+        const id = parseInt(btn.dataset.id);
+        kosarica.push({ id: id, naslov: btn.dataset.naslov, zanr: btn.dataset.zanr, godina: btn.dataset.godina });
+        localStorage.setItem('kosarica', JSON.stringify(kosarica));
+        render();
+        aside.classList.add('otvoren');
+    }
+
+    // ── Dodaj iz tablice s provjerom ocjene ───────────
     document.querySelectorAll('.k-dodaj-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const id = parseInt(btn.dataset.id);
+            const ocjena = parseFloat(btn.dataset.ocjena || 0);
+
+            // Ako je već u košarici, prekini
             if (kosarica.some(function (f) { return f.id === id; })) return;
-            kosarica.push({ id: id, naslov: btn.dataset.naslov, zanr: btn.dataset.zanr, godina: btn.dataset.godina });
-            localStorage.setItem('kosarica', JSON.stringify(kosarica));
-            render();
-            aside.classList.add('otvoren');
+
+            // Ako je ocjena ispod 5.0, prikaži uočljiv crveni okvir s upozorenjem
+            if (ocjena < 5.0) {
+                const kontejner = document.getElementById('upozorenje-posudba-kontejner');
+                kontejner.innerHTML = `
+                    <div style="border: 2px solid #c0392b; background-color: #fadbd8; padding: 20px; margin-bottom: 20px; border-radius: 8px; color: #78281f; text-align: center;">
+                        <h3 style="margin-top: 0; color: #c0392b;">⚠️ Upozorenje: Film ima nisku ocjenu!</h3>
+                        <p style="font-size: 16px;">Film <strong>${btn.dataset.naslov}</strong> ima prosječnu ocjenu ispod 5.0 (${ocjena.toFixed(1)}).</p>
+                        <p style="font-size: 15px; margin-bottom: 15px;">Ovaj film ima nisku ocjenu – jeste li sigurni da ga želite dodati u košaricu za posudbu?</p>
+                        <div>
+                            <button id="potvrdi-posudbu-btn" style="background-color: #c0392b; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Da, siguran sam</button>
+                            <button id="odustani-posudbu-btn" style="background-color: #7f8c8d; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 10px;">Odustani</button>
+                        </div>
+                    </div>
+                `;
+                // Automatski skrolaj do upozorenja da ga korisnik odmah primijeti
+                kontejner.scrollIntoView({ behavior: 'smooth' });
+
+                document.getElementById('potvrdi-posudbu-btn').onclick = function() {
+                    izvrsiDodavanjeUPosudbu(btn);
+                    kontejner.innerHTML = ''; // Ukloni upozorenje nakon potvrde
+                };
+                document.getElementById('odustani-posudbu-btn').onclick = function() {
+                    kontejner.innerHTML = ''; // Ukloni upozorenje kod odustajanja
+                };
+            } else {
+                // Ako je ocjena 5.0 ili viša, dodaj odmah
+                izvrsiDodavanjeUPosudbu(btn);
+            }
         });
     });
 
