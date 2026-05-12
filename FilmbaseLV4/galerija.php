@@ -235,75 +235,54 @@ if ($prijavljen) {
 <footer><p>&copy; 2025. Web Programiranje. Sva prava pridrzana.</p></footer>
 
 <script>
-// ── Zvjezdice – hover i klik za ocjenjivanje ─────────────────────────────
-document.querySelectorAll('.zvjezdice-wrapper').forEach(wrapper => {
-    const zvjezdice = wrapper.querySelectorAll('.zvjezdica-input');
+document.querySelectorAll('.zvjezdice-wrapper').forEach(function(wrapper) {
+    const zvjezdice = Array.from(wrapper.querySelectorAll('.zvjezdica-input'));
     const idSlike   = parseInt(wrapper.dataset.slika);
     let odabrana    = parseInt(wrapper.dataset.odabrana) || 0;
 
-    function obojiDo(n, cssClass) {
-        zvjezdice.forEach((z, i) => {
-            z.classList.toggle(cssClass, i < n);
-        });
+    function paint(n, cls) {
+        zvjezdice.forEach(function(z, i) { z.classList.toggle(cls, i < n); });
     }
 
-    zvjezdice.forEach((zvj, idx) => {
-        // Hover – privremeno oboji do hovered zvjezdice
-        zvj.addEventListener('mouseenter', () => {
-            // ukloni odabrana privremeno da hover bude čist
-            obojiDo(0, 'odabrana');
-            obojiDo(idx + 1, 'hover');
-        });
+    wrapper.addEventListener('mousemove', function(e) {
+        const z = e.target.closest('.zvjezdica-input');
+        if (!z) return;
+        paint(0, 'odabrana');
+        paint(parseInt(z.dataset.ocjena), 'hover');
+    });
 
-        // Kad miš izađe – vrati na odabranu
-        zvj.addEventListener('mouseleave', () => {
-            obojiDo(0, 'hover');
-            obojiDo(odabrana, 'odabrana');
-        });
+    wrapper.addEventListener('mouseleave', function() {
+        paint(0, 'hover');
+        paint(odabrana, 'odabrana');
+    });
 
-        // Klik – spremi ocjenu
-        zvj.addEventListener('click', async () => {
-            const novaOcjena = idx + 1;
-            odabrana = novaOcjena;
-            wrapper.dataset.odabrana = novaOcjena;
+    wrapper.addEventListener('click', async function(e) {
+        const z = e.target.closest('.zvjezdica-input');
+        if (!z) return;
+        const novaOcjena = parseInt(z.dataset.ocjena);
+        odabrana = novaOcjena;
+        wrapper.dataset.odabrana = novaOcjena;
+        paint(0, 'hover');
+        paint(odabrana, 'odabrana');
 
-            // Odmah vizualno oboji
-            obojiDo(0, 'hover');
-            obojiDo(odabrana, 'odabrana');
-
-            // Pošalji AJAX
-            const fd = new FormData();
-            fd.append('akcija', 'ocijeni');
-            fd.append('id_slika', idSlike);
-            fd.append('ocjena', novaOcjena);
-
-            try {
-                const res  = await fetch('galerija.php', {
-                    method: 'POST',
-                    body: fd,
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                });
-                const data = await res.json();
-
-                // Ažuriraj prikaz prosječne ocjene
-                const avgEl = document.getElementById('avg-' + idSlike);
-                if (avgEl) avgEl.textContent = data.avg + ' / 5 (' + data.cnt + ' ocjena)';
-
-                // Ažuriraj avg zvjezdice (readonly prikaz)
-                const kartica = document.getElementById('slika-' + idSlike);
-                const avgZvj  = kartica.querySelectorAll('.avg-ocjena .zvjezdica');
+        const fd = new FormData();
+        fd.append('akcija',   'ocijeni');
+        fd.append('id_slika', idSlike);
+        fd.append('ocjena',   novaOcjena);
+        try {
+            const res  = await fetch('galerija.php', { method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'} });
+            const data = await res.json();
+            const avgEl = document.getElementById('avg-' + idSlike);
+            if (avgEl) avgEl.textContent = data.avg + ' / 5 (' + data.cnt + ' ocjena)';
+            const kartica = document.getElementById('slika-' + idSlike);
+            if (kartica) {
+                const avgZvj = kartica.querySelectorAll('.avg-ocjena .zvjezdica');
                 const rounded = Math.round(data.avg);
-                avgZvj.forEach((z, i) => {
-                    z.classList.toggle('puna', i < rounded);
-                });
-
-                // Prikaži tekst ocjene
-                const mojaEl = document.getElementById('moja-ocjena-' + idSlike);
-                if (mojaEl) mojaEl.textContent = 'Vaša: ' + novaOcjena + '/5';
-            } catch(e) {
-                console.error('Greška pri ocjenjivanju:', e);
+                avgZvj.forEach(function(z, i) { z.classList.toggle('puna', i < rounded); });
             }
-        });
+            const mojaEl = document.getElementById('moja-ocjena-' + idSlike);
+            if (mojaEl) mojaEl.textContent = 'Vaša: ' + novaOcjena + '/5';
+        } catch(e) { console.error(e); }
     });
 });
 </script>
