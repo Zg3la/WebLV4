@@ -176,3 +176,138 @@ th {
     width: 90%;
   }
 }
+
+/* ================= ZVJEZDICE – OCJENJIVANJE ================= */
+.zvjezdica-input {
+  color: #ccc;
+  font-size: 24px;
+  cursor: pointer;
+  transition: color 0.15s, transform 0.1s;
+  display: inline-block;
+}
+
+.zvjezdica-input.odabrana {
+  color: gold;
+}
+
+.zvjezdica-input.hover {
+  color: #f5c518;
+  transform: scale(1.2);
+}
+
+.ocjeni-forma {
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.ocjeni-forma span:first-child {
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.zvjezdice-wrapper {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.moja-ocjena-tekst {
+  font-size: 13px;
+  color: #555;
+  margin-left: 6px;
+}
+
+.avg-ocjena {
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  background: #f9f9f9;
+  border-top: 1px solid #eee;
+}
+
+.avg-tekst {
+  font-size: 13px;
+  color: #666;
+  margin-left: 4px;
+}
+
+.slika-opis {
+  padding: 6px 10px;
+  margin: 0;
+  font-size: 14px;
+  color: #444;
+}
+
+/* ================= ADMIN FORMA ================= */
+.admin-forma {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px auto;
+}
+
+.forma-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.forma-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.forma-grid label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #555;
+}
+
+.forma-grid input {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.btn-primary {
+  background: lightcoral;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.btn-primary:hover {
+  background: #c0392b;
+}
+
+.btn-delete {
+  color: #c0392b;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.alert {
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin: 10px 20px;
+  font-weight: bold;
+}
+
+.alert-success { background: #d4edda; color: #155724; }
+.alert-error   { background: #f8d7da; color: #721c24; }
+.alert-warn    { background: #fff3cd; color: #856404; }
