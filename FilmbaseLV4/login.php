@@ -80,11 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
 
         <p class="auth-link">Nemate račun? <a href="registracija.php">Registrirajte se</a></p>
-        <div class="demo-info">
-            <strong>Demo pristup:</strong><br>
-            Korisničko ime: <code>admin</code><br>
-            Lozinka: <code>password</code>
-        </div>
+        
     </div>
 </main>
 
