@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <label for="check" class="checkbtn">☰</label>
     <div class="nav-links">
         <a href="index.php">Pocetna</a>
-        <a href="grafikon.html">Grafikon</a>
+        <a href="grafikon.php">Grafikon</a>
         <a href="galerija.php">Galerija</a>
         <a href="login.php"><strong>Prijava</strong></a>
         <a href="registracija.php">Registracija</a>
