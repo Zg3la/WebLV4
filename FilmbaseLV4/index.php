@@ -58,7 +58,7 @@ if ($prijavljen && isset($_GET['dodaj_videoteka']) && is_numeric($_GET['dodaj_vi
     $stmt->close();
 
     if ($odabrani_film) {
-        // Provjeri je li film već dodan u videoteku korisnika
+        // Provjeri je li film već dodan u videoteku prijavljenog korisnika
         $stmt_provjera = $conn->prepare("SELECT id FROM zeljeni_filmovi WHERE korisnik_id = ? AND film_id = ?");
         $stmt_provjera->bind_param("ii", $_SESSION['user_id'], $film_id);
         $stmt_provjera->execute();
@@ -74,7 +74,7 @@ if ($prijavljen && isset($_GET['dodaj_videoteka']) && is_numeric($_GET['dodaj_vi
                 <div style="border: 2px solid #c0392b; background-color: #fadbd8; padding: 20px; margin-bottom: 20px; border-radius: 8px; color: #78281f; text-align: center;">
                     <h3 style="margin-top: 0; color: #c0392b;">⚠️ Upozorenje: Film ima nisku ocjenu!</h3>
                     <p style="font-size: 16px;">Film <strong>' . htmlspecialchars($odabrani_film['naslov']) . '</strong> ima prosječnu ocjenu ispod 5.0 (' . number_format($odabrani_film['ocjena'], 1) . ').</p>
-                    <p style="font-size: 15px; margin-bottom: 15px;">Ovaj film ima nisku ocjenu – jeste li sigurni da ga želite dodati?</p>
+                    <p style="font-size: 15px; margin-bottom: 15px;">Ovaj film ima nisku ocjenu – jeste li sigurni da ga želite dodati u videoteku?</p>
                     <div>
                         <a href="index.php?dodaj_videoteka=' . $film_id . '&potvrdeno=1" style="background-color: #c0392b; color: white; padding: 8px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Da, siguran sam</a>
                         <a href="index.php" style="background-color: #7f8c8d; color: white; padding: 8px 16px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; margin-left: 10px;">Odustani</a>
@@ -116,7 +116,7 @@ if (isset($_GET['poruka']) && $_GET['poruka'] === 'uspjeh') {
 $moja_videoteka = [];
 $videoteka_ids  = [];
 if ($prijavljen) {
-    // Korištenje z.id za sortiranje kako bismo izbjegli grešku s nepostojećim stupcem
+    // Sortiranje po z.id osigurava rad bez obzira na to postoji li vremenski stupac
     $stmt = $conn->prepare("
         SELECT z.id AS zeljeni_id, f.id AS film_id, f.naslov, f.zanr, f.godina 
         FROM zeljeni_filmovi z 
@@ -134,7 +134,7 @@ if ($prijavljen) {
     }
 }
 
-// ── Filtriranje ─────────────────────────────────────────────────────────
+// ── Filtriranje ───────────────────────────────────────────────────────────
 $zanr_filter   = trim($_GET['zanr']    ?? '');
 $godina_filter = (int)($_GET['godina'] ?? 0);
 $ocjena_filter = isset($_GET['ocjena']) ? (float)$_GET['ocjena'] : 0;
@@ -162,7 +162,105 @@ $stmt->close();
     <link rel="stylesheet" href="css/lv4.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
-    /* ── FLOATING KOŠARICA (Netaknuto s desne strane) ────────────────────── */
+    /* ── FLOATING OSOBNA VIDEOTEKA (Lijevo) ──────────────────────────────── */
+    #library-aside {
+        position: fixed;
+        left: 0;
+        top: 180px;
+        width: 290px;
+        background: #fff;
+        border: 2px solid #2ecc71;
+        border-left: none;
+        border-radius: 0 12px 12px 0;
+        box-shadow: 4px 4px 20px rgba(0,0,0,0.18);
+        z-index: 9999;
+        transform: translateX(-100%);
+        transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+    }
+    #library-aside.otvoren {
+        transform: translateX(0);
+    }
+    #library-tab {
+        position: absolute;
+        left: 100%;
+        top: 18px;
+        background: #2ecc71;
+        color: white;
+        border: none;
+        border-radius: 0 10px 10px 0;
+        width: 48px;
+        padding: 10px 0;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        font-size: 20px;
+        box-shadow: 3px 2px 8px rgba(0,0,0,0.2);
+        user-select: none;
+    }
+    #library-badge {
+        background: white;
+        color: #2ecc71;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        font-size: 12px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #library-body {
+        padding: 14px 14px 16px;
+        max-height: 65vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    #library-body h3 {
+        margin: 0 0 10px;
+        color: #2ecc71;
+        font-size: 15px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+    }
+    #lista-library {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 10px;
+        flex: 1;
+    }
+    #lista-library li {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 7px 0;
+        border-bottom: 1px solid #f2f2f2;
+        gap: 6px;
+        font-size: 13px;
+    }
+    #lista-library li:last-child { border-bottom: none; }
+    .l-film-naslov { font-weight: bold; display: block; }
+    .l-film-meta   { color: #888; font-size: 12px; }
+    .l-ukloni {
+        color: #c0392b;
+        cursor: pointer;
+        font-size: 15px;
+        padding: 0 2px;
+        line-height: 1;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    .l-ukloni:hover { color: #922b21; }
+    #l-prazna {
+        text-align: center;
+        color: #bbb;
+        font-size: 13px;
+        padding: 16px 0;
+    }
+
+    /* ── FLOATING KOŠARICA (Desno) ───────────────────────────────────────── */
     #kosarica-aside {
         position: fixed;
         right: 0;
@@ -273,7 +371,7 @@ $stmt->close();
     }
     #k-potvrdi:hover { background: #c0392b; }
 
-    /* gumb u tablici */
+    /* Gumbi u tablici */
     .k-dodaj-btn {
         background: lightcoral;
         color: white;
@@ -284,108 +382,10 @@ $stmt->close();
         font-size: 12px;
         white-space: nowrap;
     }
-    .k-dodaj-btn:hover   { background: #c0392b; }
+    .k-dodaj-btn:hover { background: #c0392b; }
     .k-dodaj-btn.u-kosarici {
         background: #aaa;
         cursor: default;
-    }
-
-    /* ── FLOATING OSOBNA VIDEOTEKA (Dodano s lijeve strane) ──────────────── */
-    #library-aside {
-        position: fixed;
-        left: 0;
-        top: 180px;
-        width: 290px;
-        background: #fff;
-        border: 2px solid #2ecc71;
-        border-left: none;
-        border-radius: 0 12px 12px 0;
-        box-shadow: 4px 4px 20px rgba(0,0,0,0.18);
-        z-index: 9999;
-        transform: translateX(-100%);
-        transition: transform 0.28s cubic-bezier(.4,0,.2,1);
-    }
-    #library-aside.otvoren {
-        transform: translateX(0);
-    }
-    #library-tab {
-        position: absolute;
-        left: 100%;
-        top: 18px;
-        background: #2ecc71;
-        color: white;
-        border: none;
-        border-radius: 0 10px 10px 0;
-        width: 48px;
-        padding: 10px 0;
-        cursor: pointer;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-        font-size: 20px;
-        box-shadow: 3px 2px 8px rgba(0,0,0,0.2);
-        user-select: none;
-    }
-    #library-badge {
-        background: white;
-        color: #2ecc71;
-        border-radius: 50%;
-        width: 22px;
-        height: 22px;
-        font-size: 12px;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    #library-body {
-        padding: 14px 14px 16px;
-        max-height: 65vh;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-    }
-    #library-body h3 {
-        margin: 0 0 10px;
-        color: #2ecc71;
-        font-size: 15px;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 8px;
-    }
-    #lista-library {
-        list-style: none;
-        padding: 0;
-        margin: 0 0 10px;
-        flex: 1;
-    }
-    #lista-library li {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        padding: 7px 0;
-        border-bottom: 1px solid #f2f2f2;
-        gap: 6px;
-        font-size: 13px;
-    }
-    #lista-library li:last-child { border-bottom: none; }
-    .l-film-naslov { font-weight: bold; display: block; }
-    .l-film-meta   { color: #888; font-size: 12px; }
-    .l-ukloni {
-        color: #c0392b;
-        cursor: pointer;
-        font-size: 15px;
-        padding: 0 2px;
-        line-height: 1;
-        text-decoration: none;
-        font-weight: bold;
-    }
-    .l-ukloni:hover { color: #922b21; }
-    #l-prazna {
-        text-align: center;
-        color: #bbb;
-        font-size: 13px;
-        padding: 16px 0;
     }
     </style>
 </head>
@@ -566,13 +566,11 @@ $stmt->close();
 
 </main>
 <footer><p>&copy; 2025. Web Programiranje. Sva prava pridrzana.</p></footer>
-<script src="js/script.js"></script>
+
 <script>
 const KORISNIK_PRIJAVLJEN = <?= $prijavljen ? 'true' : 'false' ?>;
 
-// ════════════════════════════════════════════════════
-//  OSOBNA VIDEOTEKA – floating aside (Lijevo)
-// ════════════════════════════════════════════════════
+// Skripta za otvaranje i zatvaranje Osobne videoteke (lijeva ladica)
 (function () {
     const aside = document.getElementById('library-aside');
     const tab   = document.getElementById('library-tab');
@@ -590,141 +588,8 @@ const KORISNIK_PRIJAVLJEN = <?= $prijavljen ? 'true' : 'false' ?>;
         });
     }
 })();
-
-// ════════════════════════════════════════════════════
-//  KOŠARICA – floating aside (Desno) + Upozorenje ocjene
-// ════════════════════════════════════════════════════
-(function () {
-    const aside  = document.getElementById('kosarica-aside');
-    const tab    = document.getElementById('kosarica-tab');
-    const lista  = document.getElementById('lista-kosarice');
-    const prazna = document.getElementById('k-prazna');
-    const badge  = document.getElementById('kosarica-badge');
-    const potvrdi = document.getElementById('k-potvrdi');
-
-    let kosarica = JSON.parse(localStorage.getItem('kosarica') || '[]');
-
-    // ── Otvori / zatvori ────────────────────────────
-    tab.addEventListener('click', function (e) {
-        e.stopPropagation();
-        aside.classList.toggle('otvoren');
-    });
-
-    // Klik izvan košarice zatvori je
-    document.addEventListener('click', function (e) {
-        if (aside.classList.contains('otvoren') && !aside.contains(e.target)) {
-            aside.classList.remove('otvoren');
-        }
-    });
-
-    // ── Render košarice ──────────────────────────────
-    function render() {
-        badge.textContent = kosarica.length;
-        lista.innerHTML   = '';
-
-        if (kosarica.length === 0) {
-            prazna.style.display = 'block';
-        } else {
-            prazna.style.display = 'none';
-            kosarica.forEach(function (film, i) {
-                const li = document.createElement('li');
-                li.innerHTML =
-                    '<div><span class="k-film-naslov">' + film.naslov + '</span>' +
-                    '<span class="k-film-meta">' + film.zanr + ' · ' + film.godina + '</span></div>' +
-                    '<button class="k-ukloni" data-i="' + i + '" title="Ukloni">✕</button>';
-                lista.appendChild(li);
-            });
-        }
-
-        // Osvježi stanje gumba u tablici
-        document.querySelectorAll('.k-dodaj-btn').forEach(function (btn) {
-            const uKosarici = kosarica.some(function (f) { return f.id === parseInt(btn.dataset.id); });
-            btn.textContent = uKosarici ? '✓ Dodano' : '🛒 Dodaj';
-            btn.classList.toggle('u-kosarici', uKosarici);
-            btn.disabled = uKosarici;
-        });
-    }
-
-    // ── Ukloni klik (event delegation na listi) ───────
-    lista.addEventListener('click', function (e) {
-        const btn = e.target.closest('.k-ukloni');
-        if (!btn) return;
-        kosarica.splice(parseInt(btn.dataset.i), 1);
-        localStorage.setItem('kosarica', JSON.stringify(kosarica));
-        render();
-    });
-
-    // Pomoćna funkcija za konačno dodavanje u posudbu
-    function izvrsiDodavanjeUPosudbu(btn) {
-        const id = parseInt(btn.dataset.id);
-        kosarica.push({ id: id, naslov: btn.dataset.naslov, zanr: btn.dataset.zanr, godina: btn.dataset.godina });
-        localStorage.setItem('kosarica', JSON.stringify(kosarica));
-        render();
-        aside.classList.add('otvoren');
-    }
-
-    // ── Dodaj iz tablice s provjerom ocjene ───────────
-    document.querySelectorAll('.k-dodaj-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            const id = parseInt(btn.dataset.id);
-            const ocjena = parseFloat(btn.dataset.ocjena || 0);
-
-            // Ako je već u košarici, prekini
-            if (kosarica.some(function (f) { return f.id === id; })) return;
-
-            // Ako je ocjena ispod 5.0, prikaži uočljiv crveni okvir s upozorenjem
-            if (ocjena < 5.0) {
-                const kontejner = document.getElementById('upozorenje-posudba-kontejner');
-                kontejner.innerHTML = `
-                    <div style="border: 2px solid #c0392b; background-color: #fadbd8; padding: 20px; margin-bottom: 20px; border-radius: 8px; color: #78281f; text-align: center;">
-                        <h3 style="margin-top: 0; color: #c0392b;">⚠️ Upozorenje: Film ima nisku ocjenu!</h3>
-                        <p style="font-size: 16px;">Film <strong>${btn.dataset.naslov}</strong> ima prosječnu ocjenu ispod 5.0 (${ocjena.toFixed(1)}).</p>
-                        <p style="font-size: 15px; margin-bottom: 15px;">Ovaj film ima nisku ocjenu – jeste li sigurni da ga želite dodati u košaricu za posudbu?</p>
-                        <div>
-                            <button id="potvrdi-posudbu-btn" style="background-color: #c0392b; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Da, siguran sam</button>
-                            <button id="odustani-posudbu-btn" style="background-color: #7f8c8d; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 10px;">Odustani</button>
-                        </div>
-                    </div>
-                `;
-                // Automatski skrolaj do upozorenja da ga korisnik odmah primijeti
-                kontejner.scrollIntoView({ behavior: 'smooth' });
-
-                document.getElementById('potvrdi-posudbu-btn').onclick = function() {
-                    izvrsiDodavanjeUPosudbu(btn);
-                    kontejner.innerHTML = ''; // Ukloni upozorenje nakon potvrde
-                };
-                document.getElementById('odustani-posudbu-btn').onclick = function() {
-                    kontejner.innerHTML = ''; // Ukloni upozorenje kod odustajanja
-                };
-            } else {
-                // Ako je ocjena 5.0 ili viša, dodaj odmah
-                izvrsiDodavanjeUPosudbu(btn);
-            }
-        });
-    });
-
-    // ── Potvrdi posudbu ──────────────────────────────
-    potvrdi.addEventListener('click', function () {
-        if (!KORISNIK_PRIJAVLJEN) {
-            if (confirm('Morate biti prijavljeni za posudbu.\nŽelite li se prijaviti?')) {
-                window.location.href = 'login.php';
-            }
-            return;
-        }
-        if (kosarica.length === 0) {
-            alert('Košarica je prazna!');
-            return;
-        }
-        const broj = kosarica.length;
-        alert('✅ Uspješno ste dodali ' + broj + ' ' + (broj === 1 ? 'film' : 'filma') + ' u svoju košaricu za vikend maraton!');
-        kosarica = [];
-        localStorage.setItem('kosarica', JSON.stringify(kosarica));
-        render();
-        aside.classList.remove('otvoren');
-    });
-
-    render();
-})();
 </script>
+
+<script src="js/script.js"></script>
 </body>
 </html>
