@@ -7,27 +7,25 @@ $prijavljen   = isLoggedIn();
 $je_admin     = isAdmin();
 $korisnik_ime = $_SESSION['korisnicko_ime'] ?? '';
 
-// ── Dodaj film u bazu (admin) ──────────────────────────────────────────────
+// ── Dodaj film u bazu (admin) ─────────────────────────────────────────────
 $poruka_forma = '';
 if ($je_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija']) && $_POST['akcija'] === 'dodaj_film') {
-    $naslov    = trim($_POST['naslov']    ?? '');
-    $zanr      = trim($_POST['zanr']      ?? '');
-    $godina    = (int)($_POST['godina']   ?? 0);
-    $trajanje  = (int)($_POST['trajanje'] ?? 0);
-    $ocjena    = (float)($_POST['ocjena'] ?? 0);
-    $redatelj  = trim($_POST['redatelj']  ?? '');
-    $zemlja    = trim($_POST['zemlja']    ?? '');
+    $naslov   = trim($_POST['naslov']    ?? '');
+    $zanr     = trim($_POST['zanr']      ?? '');
+    $godina   = (int)($_POST['godina']   ?? 0);
+    $trajanje = (int)($_POST['trajanje'] ?? 0);
+    $ocjena   = (float)($_POST['ocjena'] ?? 0);
+    $redatelj = trim($_POST['redatelj']  ?? '');
+    $zemlja   = trim($_POST['zemlja']    ?? '');
 
     if (!$naslov || !$zanr || $godina < 1888 || $godina > 2030 || $trajanje < 1 || $trajanje > 600) {
         $poruka_forma = '<div class="alert alert-error">Neispravni podaci. Provjeri godinu (1888–2030) i trajanje (1–600 min).</div>';
     } else {
         $stmt = $conn->prepare("INSERT INTO filmovi (naslov, zanr, godina, trajanje_min, ocjena, redatelj, zemlja) VALUES (?,?,?,?,?,?,?)");
         $stmt->bind_param("ssiidss", $naslov, $zanr, $godina, $trajanje, $ocjena, $redatelj, $zemlja);
-        if ($stmt->execute()) {
-            $poruka_forma = '<div class="alert alert-success">Film uspješno dodan!</div>';
-        } else {
-            $poruka_forma = '<div class="alert alert-error">Greška pri dodavanju filma.</div>';
-        }
+        $poruka_forma = $stmt->execute()
+            ? '<div class="alert alert-success">Film uspješno dodan!</div>'
+            : '<div class="alert alert-error">Greška pri dodavanju filma.</div>';
         $stmt->close();
     }
 }
@@ -43,90 +41,23 @@ if ($je_admin && isset($_GET['brisi']) && is_numeric($_GET['brisi'])) {
     exit;
 }
 
-// ── Dodaj u videoteku (korisnik) ──────────────────────────────────────────
-$poruka_videoteka = '';
-if ($prijavljen && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija']) && $_POST['akcija'] === 'dodaj_u_videoteku') {
-    $film_id = (int)($_POST['film_id'] ?? 0);
-    if ($film_id > 0) {
-        $res = $conn->query("SELECT ocjena FROM filmovi WHERE id = $film_id");
-        $film_row = $res->fetch_assoc();
-        $upozorenje = ($film_row && $film_row['ocjena'] < 5.0);
+// ── Filtriranje ───────────────────────────────────────────────────────────
+$zanr_filter   = trim($_GET['zanr']    ?? '');
+$godina_filter = (int)($_GET['godina'] ?? 0);
+$ocjena_filter = isset($_GET['ocjena']) ? (float)$_GET['ocjena'] : 0;
+$sort          = in_array($_GET['sort'] ?? '', ['naslov','godina','ocjena']) ? $_GET['sort'] : 'naslov';
 
-        $stmt = $conn->prepare("INSERT IGNORE INTO zeljeni_filmovi (korisnik_id, film_id) VALUES (?, ?)");
-        $stmt->bind_param("ii", $_SESSION['user_id'], $film_id);
-        $stmt->execute();
-        $stmt->close();
+$where = ["1=1"]; $params = []; $types = "";
+if ($zanr_filter)   { $where[] = "zanr LIKE ?";   $params[] = "%$zanr_filter%"; $types .= "s"; }
+if ($godina_filter) { $where[] = "godina >= ?";    $params[] = $godina_filter;  $types .= "i"; }
+if ($ocjena_filter) { $where[] = "ocjena >= ?";    $params[] = $ocjena_filter;  $types .= "d"; }
 
-        if ($upozorenje) {
-            $poruka_videoteka = '<div class="alert alert-warn">⚠️ Ovaj film ima nisku ocjenu – jeste li sigurni da ga želite dodati?</div>';
-        } else {
-            $poruka_videoteka = '<div class="alert alert-success">Film dodan u vašu videoteku!</div>';
-        }
-    }
-}
-
-// ── Ukloni iz videoteke ───────────────────────────────────────────────────
-if ($prijavljen && isset($_GET['ukloni']) && is_numeric($_GET['ukloni'])) {
-    $film_id = (int)$_GET['ukloni'];
-    $stmt = $conn->prepare("DELETE FROM zeljeni_filmovi WHERE korisnik_id = ? AND film_id = ?");
-    $stmt->bind_param("ii", $_SESSION['user_id'], $film_id);
-    $stmt->execute();
-    $stmt->close();
-    header('Location: index.php#videoteka');
-    exit;
-}
-
-// ── Filtriranje i prikaz filmova ──────────────────────────────────────────
-$zanr_filter    = trim($_GET['zanr']    ?? '');
-$godina_filter  = (int)($_GET['godina'] ?? 0);
-$ocjena_filter  = isset($_GET['ocjena']) ? (float)$_GET['ocjena'] : 0;
-$sort           = in_array($_GET['sort'] ?? '', ['naslov','godina','ocjena']) ? $_GET['sort'] : 'naslov';
-
-$where = ["1=1"];
-$params = [];
-$types  = "";
-
-if ($zanr_filter) {
-    $where[] = "zanr LIKE ?";
-    $params[] = "%$zanr_filter%";
-    $types .= "s";
-}
-if ($godina_filter > 0) {
-    $where[] = "godina >= ?";
-    $params[] = $godina_filter;
-    $types .= "i";
-}
-if ($ocjena_filter > 0) {
-    $where[] = "ocjena >= ?";
-    $params[] = $ocjena_filter;
-    $types .= "d";
-}
-
-$sql = "SELECT * FROM filmovi WHERE " . implode(" AND ", $where) . " ORDER BY $sort ASC";
+$sql  = "SELECT * FROM filmovi WHERE " . implode(" AND ", $where) . " ORDER BY $sort ASC";
 $stmt = $conn->prepare($sql);
-if ($params) {
-    $stmt->bind_param($types, ...$params);
-}
+if ($params) $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $filmovi = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
-
-// ── Moja videoteka ────────────────────────────────────────────────────────
-$moji_filmovi = [];
-$moji_ids = [];
-if ($prijavljen) {
-    $stmt = $conn->prepare("
-        SELECT f.* FROM filmovi f
-        JOIN zeljeni_filmovi zf ON f.id = zf.film_id
-        WHERE zf.korisnik_id = ?
-        ORDER BY zf.datum_dodavanja DESC
-    ");
-    $stmt->bind_param("i", $_SESSION['user_id']);
-    $stmt->execute();
-    $moji_filmovi = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $moji_ids = array_column($moji_filmovi, 'id');
-    $stmt->close();
-}
 ?>
 <!DOCTYPE html>
 <html lang="hr">
@@ -138,49 +69,46 @@ if ($prijavljen) {
     <link rel="stylesheet" href="css/lv4.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
-    /* ── FLOATING KOŠARICA ──────────────────────────── */
+    /* ── FLOATING KOŠARICA ───────────────────────────────────────────────── */
     #kosarica-aside {
         position: fixed;
         right: 0;
-        top: 160px;
-        width: 280px;
+        top: 180px;
+        width: 290px;
         background: #fff;
         border: 2px solid lightcoral;
         border-right: none;
         border-radius: 12px 0 0 12px;
-        box-shadow: -4px 4px 16px rgba(0,0,0,0.15);
-        z-index: 1000;
-        transition: transform 0.3s ease;
-        transform: translateX(calc(100% - 46px));
+        box-shadow: -4px 4px 20px rgba(0,0,0,0.18);
+        z-index: 9999;
+        /* skrivena – samo tab visi van s desne strane */
+        transform: translateX(100%);
+        transition: transform 0.28s cubic-bezier(.4,0,.2,1);
     }
-
     #kosarica-aside.otvoren {
         transform: translateX(0);
     }
-
-    #kosarica-toggle {
+    /* Tab koji uvijek viri s desne strane */
+    #kosarica-tab {
         position: absolute;
-        left: -46px;
-        top: 50%;
-        transform: translateY(-50%);
+        right: 100%;
+        top: 18px;
         background: lightcoral;
         color: white;
         border: none;
         border-radius: 10px 0 0 10px;
-        width: 46px;
-        height: 60px;
+        width: 48px;
+        padding: 10px 0;
         cursor: pointer;
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        gap: 2px;
+        gap: 4px;
         font-size: 20px;
-        font-weight: bold;
         box-shadow: -3px 2px 8px rgba(0,0,0,0.2);
+        user-select: none;
     }
-
-    #kosarica-broj-badge {
+    #kosarica-badge {
         background: white;
         color: lightcoral;
         border-radius: 50%;
@@ -191,84 +119,57 @@ if ($prijavljen) {
         display: flex;
         align-items: center;
         justify-content: center;
-        line-height: 1;
     }
-
-    #kosarica-sadrzaj {
-        padding: 16px;
-        max-height: 70vh;
+    #kosarica-body {
+        padding: 14px 14px 16px;
+        max-height: 65vh;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
     }
-
-    #kosarica-sadrzaj h3 {
-        margin: 0 0 12px 0;
+    #kosarica-body h3 {
+        margin: 0 0 10px;
         color: lightcoral;
-        font-size: 16px;
+        font-size: 15px;
         border-bottom: 1px solid #eee;
         padding-bottom: 8px;
     }
-
     #lista-kosarice {
         list-style: none;
         padding: 0;
-        margin: 0 0 12px 0;
+        margin: 0 0 10px;
         flex: 1;
     }
-
     #lista-kosarice li {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        padding: 8px 0;
-        border-bottom: 1px solid #f0f0f0;
-        font-size: 13px;
+        padding: 7px 0;
+        border-bottom: 1px solid #f2f2f2;
         gap: 6px;
+        font-size: 13px;
     }
-
-    #lista-kosarice li:last-child {
-        border-bottom: none;
-    }
-
-    #lista-kosarice li .film-info {
-        flex: 1;
-        line-height: 1.4;
-    }
-
-    #lista-kosarice li .film-naslov {
-        font-weight: bold;
-        display: block;
-    }
-
-    #lista-kosarice li .film-meta {
-        color: #888;
-        font-size: 12px;
-    }
-
-    .ukloni-btn {
+    #lista-kosarice li:last-child { border-bottom: none; }
+    .k-film-naslov { font-weight: bold; display: block; }
+    .k-film-meta   { color: #888; font-size: 12px; }
+    .k-ukloni {
         background: none;
         border: none;
         color: #c0392b;
         cursor: pointer;
-        font-size: 16px;
+        font-size: 17px;
         padding: 0 2px;
         flex-shrink: 0;
         line-height: 1;
     }
-
-    .ukloni-btn:hover {
-        color: #922b21;
-    }
-
-    #kosarica-prazna {
+    .k-ukloni:hover { color: #922b21; }
+    #k-prazna {
         text-align: center;
-        color: #aaa;
+        color: #bbb;
         font-size: 13px;
-        padding: 20px 0;
+        padding: 16px 0;
     }
-
-    #potvrdi-kosaricu {
+    #k-potvrdi {
         width: 100%;
         background: lightcoral;
         color: white;
@@ -278,15 +179,11 @@ if ($prijavljen) {
         cursor: pointer;
         font-size: 14px;
         font-weight: bold;
-        margin-top: 4px;
     }
+    #k-potvrdi:hover { background: #c0392b; }
 
-    #potvrdi-kosaricu:hover {
-        background: #c0392b;
-    }
-
-    /* Gumb za dodavanje u košaricu u tablici */
-    .dodaj-kosarica-btn {
+    /* gumb u tablici */
+    .k-dodaj-btn {
         background: lightcoral;
         color: white;
         border: none;
@@ -296,35 +193,30 @@ if ($prijavljen) {
         font-size: 12px;
         white-space: nowrap;
     }
-
-    .dodaj-kosarica-btn:hover {
-        background: #c0392b;
-    }
-
-    .dodaj-kosarica-btn:disabled {
+    .k-dodaj-btn:hover   { background: #c0392b; }
+    .k-dodaj-btn.u-kosarici {
         background: #aaa;
-        cursor: not-allowed;
+        cursor: default;
     }
     </style>
 </head>
 <body>
 
-<!-- ── FLOATING KOŠARICA ASIDE ────────────────────────────────────────── -->
+<!-- ── FLOATING KOŠARICA ─────────────────────────────────────────────────── -->
 <aside id="kosarica-aside">
-    <button id="kosarica-toggle" title="Košarica za posudbu">
+    <button id="kosarica-tab" title="Otvori košaricu">
         🎬
-        <span id="kosarica-broj-badge">0</span>
+        <span id="kosarica-badge">0</span>
     </button>
-    <div id="kosarica-sadrzaj">
+    <div id="kosarica-body">
         <h3>🛒 Košarica za posudbu</h3>
         <ul id="lista-kosarice"></ul>
-        <p id="kosarica-prazna">Košarica je prazna.<br>Dodajte filmove iz tablice.</p>
-        <button id="potvrdi-kosaricu">✅ Potvrdi posudbu</button>
+        <p id="k-prazna">Košarica je prazna.<br>Dodajte filmove iz tablice.</p>
+        <button id="k-potvrdi">✅ Potvrdi posudbu</button>
     </div>
 </aside>
 
 <header id="Naslov"><h1>Dobrodosli na moju web stranicu</h1></header>
-
 <nav class="navbar">
     <input type="checkbox" id="check">
     <label for="check" class="checkbtn">☰</label>
@@ -343,14 +235,11 @@ if ($prijavljen) {
 
 <main>
 
-<!-- ==================== LV4 ZADATAK 1a: Filmovi iz baze ==================== -->
 <section id="filmovi-baza">
     <h1 id="tablicatekst">🎬 FILMOVI IZ BAZE PODATAKA (LV4)</h1>
 
     <?= $poruka_forma ?>
-    <?= $poruka_videoteka ?>
 
-    <!-- Filter forma (server-side) -->
     <form method="GET" action="index.php" id="db-filteri">
         <div id="filteri">
             <label>Žanr:</label>
@@ -366,12 +255,12 @@ if ($prijavljen) {
             <input type="number" name="ocjena" value="<?= $ocjena_filter ?: '' ?>" step="0.1" min="0" max="10" placeholder="0–10">
             <label>Sortiraj po:</label>
             <select name="sort">
-                <option value="naslov"  <?= $sort==='naslov'  ? 'selected':'' ?>>Naslovu</option>
-                <option value="godina"  <?= $sort==='godina'  ? 'selected':'' ?>>Godini</option>
-                <option value="ocjena"  <?= $sort==='ocjena'  ? 'selected':'' ?>>Ocjeni</option>
+                <option value="naslov" <?= $sort==='naslov' ? 'selected':'' ?>>Naslovu</option>
+                <option value="godina" <?= $sort==='godina' ? 'selected':'' ?>>Godini</option>
+                <option value="ocjena" <?= $sort==='ocjena' ? 'selected':'' ?>>Ocjeni</option>
             </select>
-            <button type="submit" id="primijeni-filtere">Filtriraj</button>
-            <a href="index.php" style="margin-left:8px;"><button type="button" id="reset-filtere">Poništi</button></a>
+            <button type="submit">Filtriraj</button>
+            <a href="index.php" style="margin-left:8px;"><button type="button">Poništi</button></a>
         </div>
     </form>
 
@@ -382,7 +271,6 @@ if ($prijavljen) {
                     <th>Naslov</th><th>Žanr</th><th>Godina</th>
                     <th>Trajanje</th><th>Ocjena</th><th>Redatelj</th><th>Zemlja</th>
                     <th>Košarica</th>
-                    <?php if ($prijavljen): ?><th>Videoteka</th><?php endif; ?>
                     <?php if ($je_admin): ?><th>Akcije</th><?php endif; ?>
                 </tr>
             </thead>
@@ -397,7 +285,7 @@ if ($prijavljen) {
                     <td><?= htmlspecialchars($film['redatelj'] ?? '–') ?></td>
                     <td><?= htmlspecialchars($film['zemlja'] ?? '–') ?></td>
                     <td>
-                        <button class="dodaj-kosarica-btn"
+                        <button class="k-dodaj-btn"
                             data-id="<?= $film['id'] ?>"
                             data-naslov="<?= htmlspecialchars($film['naslov'], ENT_QUOTES) ?>"
                             data-zanr="<?= htmlspecialchars($film['zanr'], ENT_QUOTES) ?>"
@@ -405,19 +293,6 @@ if ($prijavljen) {
                             🛒 Dodaj
                         </button>
                     </td>
-                    <?php if ($prijavljen): ?>
-                    <td>
-                        <?php if (in_array($film['id'], $moji_ids)): ?>
-                            <span style="color:green">✓ U videoteci</span>
-                        <?php else: ?>
-                            <form method="POST" style="display:inline">
-                                <input type="hidden" name="akcija" value="dodaj_u_videoteku">
-                                <input type="hidden" name="film_id" value="<?= $film['id'] ?>">
-                                <button type="submit" class="dodaj-btn">+ Dodaj</button>
-                            </form>
-                        <?php endif; ?>
-                    </td>
-                    <?php endif; ?>
                     <?php if ($je_admin): ?>
                     <td>
                         <a href="?brisi=<?= $film['id'] ?>" class="btn-delete"
@@ -427,13 +302,12 @@ if ($prijavljen) {
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($filmovi)): ?>
-                <tr><td colspan="10" style="text-align:center">Nema rezultata.</td></tr>
+                <tr><td colspan="9" style="text-align:center">Nema rezultata.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <!-- Admin: Dodaj novi film -->
     <?php if ($je_admin): ?>
     <div class="admin-forma">
         <h3>➕ Dodaj novi film</h3>
@@ -453,145 +327,106 @@ if ($prijavljen) {
     </div>
     <?php elseif (!$prijavljen): ?>
     <p style="text-align:center;color:#888;margin:20px">
-        <a href="login.php">Prijavite se</a> kako biste dodali filmove u svoju videoteku.
+        <a href="login.php">Prijavite se</a> za više mogućnosti.
     </p>
     <?php endif; ?>
 </section>
 
-<!-- ==================== LV4: Moja videoteka ==================== -->
-<?php if ($prijavljen): ?>
-<section id="videoteka">
-    <h1 id="tablicatekst">📚 MOJA VIDEOTEKA</h1>
-    <?php if (empty($moji_filmovi)): ?>
-        <p style="text-align:center;color:#888">Vaša videoteka je prazna. Dodajte filmove iz tablice iznad.</p>
-    <?php else: ?>
-    <div class="container">
-        <table id="filtriranje-tablica" style="width:100%">
-            <thead>
-                <tr><th>Naslov</th><th>Žanr</th><th>Godina</th><th>Ocjena</th><th>Ukloni</th></tr>
-            </thead>
-            <tbody>
-            <?php foreach ($moji_filmovi as $film): ?>
-                <tr>
-                    <td><?= htmlspecialchars($film['naslov']) ?></td>
-                    <td><?= htmlspecialchars($film['zanr']) ?></td>
-                    <td><?= $film['godina'] ?></td>
-                    <td><?= number_format($film['ocjena'], 1) ?></td>
-                    <td>
-                        <a href="?ukloni=<?= $film['id'] ?>#videoteka" class="btn-delete"
-                           onclick="return confirm('Ukloniti film iz videoteke?')">✕ Ukloni</a>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php endif; ?>
-</section>
-<?php endif; ?>
-
 </main>
-
 <footer><p>&copy; 2025. Web Programiranje. Sva prava pridrzana.</p></footer>
 <script src="js/script.js"></script>
 <script>
-// ── KOŠARICA – floating aside ────────────────────────────────────────────
-let kosarica = JSON.parse(localStorage.getItem('kosarica_filmovi') || '[]');
+// ════════════════════════════════════════════════════
+//  KOŠARICA – floating aside
+// ════════════════════════════════════════════════════
+(function () {
+    const aside  = document.getElementById('kosarica-aside');
+    const tab    = document.getElementById('kosarica-tab');
+    const lista  = document.getElementById('lista-kosarice');
+    const prazna = document.getElementById('k-prazna');
+    const badge  = document.getElementById('kosarica-badge');
+    const potvrdi = document.getElementById('k-potvrdi');
 
-const aside       = document.getElementById('kosarica-aside');
-const toggleBtn   = document.getElementById('kosarica-toggle');
-const lista       = document.getElementById('lista-kosarice');
-const praznaTekst = document.getElementById('kosarica-prazna');
-const badge       = document.getElementById('kosarica-broj-badge');
+    let kosarica = JSON.parse(localStorage.getItem('kosarica') || '[]');
 
-// Otvori/zatvori košaricu
-toggleBtn.addEventListener('click', () => {
-    aside.classList.toggle('otvoren');
-});
+    // ── Otvori / zatvori ────────────────────────────
+    tab.addEventListener('click', function (e) {
+        e.stopPropagation();
+        aside.classList.toggle('otvoren');
+    });
 
-function spremiKosaricu() {
-    localStorage.setItem('kosarica_filmovi', JSON.stringify(kosarica));
-}
+    // Klik izvan košarice zatvori je
+    document.addEventListener('click', function (e) {
+        if (aside.classList.contains('otvoren') && !aside.contains(e.target)) {
+            aside.classList.remove('otvoren');
+        }
+    });
 
-function osvjeziKosaricu() {
-    lista.innerHTML = '';
-    badge.textContent = kosarica.length;
+    // ── Render košarice ──────────────────────────────
+    function render() {
+        badge.textContent = kosarica.length;
+        lista.innerHTML   = '';
 
-    if (kosarica.length === 0) {
-        praznaTekst.style.display = 'block';
-    } else {
-        praznaTekst.style.display = 'none';
-        kosarica.forEach((film, index) => {
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <div class="film-info">
-                    <span class="film-naslov">${film.naslov}</span>
-                    <span class="film-meta">${film.zanr} · ${film.godina}</span>
-                </div>
-                <button class="ukloni-btn" title="Ukloni">✕</button>
-            `;
-            li.querySelector('.ukloni-btn').addEventListener('click', () => {
-                ukloniIzKosarice(index);
+        if (kosarica.length === 0) {
+            prazna.style.display = 'block';
+        } else {
+            prazna.style.display = 'none';
+            kosarica.forEach(function (film, i) {
+                const li = document.createElement('li');
+                li.innerHTML =
+                    '<div><span class="k-film-naslov">' + film.naslov + '</span>' +
+                    '<span class="k-film-meta">' + film.zanr + ' · ' + film.godina + '</span></div>' +
+                    '<button class="k-ukloni" data-i="' + i + '" title="Ukloni">✕</button>';
+                lista.appendChild(li);
             });
-            lista.appendChild(li);
+        }
+
+        // Osvježi stanje gumba u tablici
+        document.querySelectorAll('.k-dodaj-btn').forEach(function (btn) {
+            const uKosarici = kosarica.some(function (f) { return f.id === parseInt(btn.dataset.id); });
+            btn.textContent = uKosarici ? '✓ Dodano' : '🛒 Dodaj';
+            btn.classList.toggle('u-kosarici', uKosarici);
+            btn.disabled = uKosarici;
         });
     }
 
-    // Osvježi stanje gumba u tablici
-    document.querySelectorAll('.dodaj-kosarica-btn').forEach(btn => {
-        const id = parseInt(btn.dataset.id);
-        const uKosarici = kosarica.some(f => f.id === id);
-        btn.disabled = uKosarici;
-        btn.textContent = uKosarici ? '✓ Dodano' : '🛒 Dodaj';
+    // ── Ukloni klik (event delegation na listi) ───────
+    lista.addEventListener('click', function (e) {
+        const btn = e.target.closest('.k-ukloni');
+        if (!btn) return;
+        kosarica.splice(parseInt(btn.dataset.i), 1);
+        localStorage.setItem('kosarica', JSON.stringify(kosarica));
+        render();
     });
-}
 
-function dodajUKosaricu(film) {
-    if (kosarica.some(f => f.id === film.id)) {
-        alert(`"${film.naslov}" je već u košarici!`);
-        return;
-    }
-    kosarica.push(film);
-    spremiKosaricu();
-    osvjeziKosaricu();
-    // Otvori košaricu na kratko
-    aside.classList.add('otvoren');
-}
-
-function ukloniIzKosarice(index) {
-    kosarica.splice(index, 1);
-    spremiKosaricu();
-    osvjeziKosaricu();
-}
-
-// Gumbi u tablici – dodaj u košaricu
-document.querySelectorAll('.dodaj-kosarica-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        dodajUKosaricu({
-            id:     parseInt(btn.dataset.id),
-            naslov: btn.dataset.naslov,
-            zanr:   btn.dataset.zanr,
-            godina: btn.dataset.godina
+    // ── Dodaj iz tablice ─────────────────────────────
+    document.querySelectorAll('.k-dodaj-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const id = parseInt(btn.dataset.id);
+            if (kosarica.some(function (f) { return f.id === id; })) return;
+            kosarica.push({ id: id, naslov: btn.dataset.naslov, zanr: btn.dataset.zanr, godina: btn.dataset.godina });
+            localStorage.setItem('kosarica', JSON.stringify(kosarica));
+            render();
+            aside.classList.add('otvoren');
         });
     });
-});
 
-// Potvrdi posudbu
-document.getElementById('potvrdi-kosaricu').addEventListener('click', () => {
-    if (kosarica.length === 0) {
-        alert('Košarica je prazna! Dodajte filmove prije potvrde.');
-        return;
-    }
-    const broj = kosarica.length;
-    alert(`✅ Uspješno ste dodali ${broj} ${broj === 1 ? 'film' : 'filma'} u svoju košaricu za vikend maraton!`);
-    kosarica = [];
-    spremiKosaricu();
-    osvjeziKosaricu();
-    aside.classList.remove('otvoren');
-});
+    // ── Potvrdi posudbu ──────────────────────────────
+    potvrdi.addEventListener('click', function () {
+        if (kosarica.length === 0) {
+            alert('Košarica je prazna!');
+            return;
+        }
+        const broj = kosarica.length;
+        alert('✅ Uspješno ste dodali ' + broj + ' ' + (broj === 1 ? 'film' : 'filma') + ' u svoju košaricu za vikend maraton!');
+        kosarica = [];
+        localStorage.setItem('kosarica', JSON.stringify(kosarica));
+        render();
+        aside.classList.remove('otvoren');
+    });
 
-// Inicijaliziraj košaricu
-osvjeziKosaricu();
+    render();
+})();
 </script>
 </body>
 </html>
