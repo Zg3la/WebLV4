@@ -212,7 +212,7 @@ $stmt->close();
         <h3>🛒 Košarica za posudbu</h3>
         <ul id="lista-kosarice"></ul>
         <p id="k-prazna">Košarica je prazna.<br>Dodajte filmove iz tablice.</p>
-        <button id="k-potvrdi">✅ Potvrdi posudbu</button>
+        <button id="k-potvrdi"><?= $prijavljen ? "✅ Potvrdi posudbu" : "🔒 Potvrdi posudbu" ?></button>
     </div>
 </aside>
 
@@ -336,6 +336,8 @@ $stmt->close();
 <footer><p>&copy; 2025. Web Programiranje. Sva prava pridrzana.</p></footer>
 <script src="js/script.js"></script>
 <script>
+const KORISNIK_PRIJAVLJEN = <?= $prijavljen ? 'true' : 'false' ?>;
+
 // ════════════════════════════════════════════════════
 //  KOŠARICA – floating aside
 // ════════════════════════════════════════════════════
@@ -413,6 +415,12 @@ $stmt->close();
 
     // ── Potvrdi posudbu ──────────────────────────────
     potvrdi.addEventListener('click', function () {
+        if (!KORISNIK_PRIJAVLJEN) {
+            if (confirm('Morate biti prijavljeni za posudbu.\nŽelite li se prijaviti?')) {
+                window.location.href = 'login.php';
+            }
+            return;
+        }
         if (kosarica.length === 0) {
             alert('Košarica je prazna!');
             return;
