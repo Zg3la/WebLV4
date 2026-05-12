@@ -120,7 +120,7 @@ if ($prijavljen) {
 <?= $poruka ?>
 
 <section id="ocjenjivanje">
-    <h1 class="section-title">⭐ OCJENJIVANJE FOTOGRAFIJA (LV4)</h1>
+    <h1 class="section-title"></h1>
 
     <?php if (!$prijavljen): ?>
         <p class="info-tekst"><a href="login.php">Prijavite se</a> kako biste mogli ocjenjivati fotografije.</p>
