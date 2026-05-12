@@ -12,7 +12,6 @@ if ($je_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija']
     $opis = trim($_POST['opis'] ?? '');
 
     if (!empty($_POST['url_slike'])) {
-        // Dodaj sliku putem URL-a
         $url = trim($_POST['url_slike']);
         $naziv = basename(parse_url($url, PHP_URL_PATH)) ?: 'slika_' . time();
         $stmt = $conn->prepare("INSERT INTO slike (naziv_datoteke, opis, putanja, izvor) VALUES (?,?,?,'url')");
@@ -22,9 +21,8 @@ if ($je_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija']
         }
         $stmt->close();
     } elseif (isset($_FILES['slika']) && $_FILES['slika']['error'] === UPLOAD_ERR_OK) {
-        // Lokalni upload
         $allowed = ['image/jpeg', 'image/png'];
-        $max_size = 5 * 1024 * 1024; // 5MB
+        $max_size = 5 * 1024 * 1024;
 
         if (!in_array($_FILES['slika']['type'], $allowed)) {
             $poruka = '<div class="alert alert-error">Dopušteni su samo JPEG i PNG formati.</div>';
@@ -57,7 +55,7 @@ if ($je_admin && isset($_GET['brisi_sliku']) && is_numeric($_GET['brisi_sliku'])
     exit;
 }
 
-// ── Ocjeni sliku (AJAX ili POST) ──────────────────────────────────────────
+// ── Ocjeni sliku (AJAX) ────────────────────────────────────────────────────
 if ($prijavljen && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija']) && $_POST['akcija'] === 'ocijeni') {
     $id_slika = (int)($_POST['id_slika'] ?? 0);
     $ocjena   = (int)($_POST['ocjena']   ?? 0);
@@ -72,7 +70,6 @@ if ($prijavljen && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['akcija
         $stmt->execute();
         $stmt->close();
 
-        // Vrati JSON ako je AJAX
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
             $res = $conn->query("SELECT AVG(ocjena) as avg_o, COUNT(*) as cnt FROM ocjene WHERE id_slika = $id_slika");
             $row = $res->fetch_assoc();
@@ -97,7 +94,6 @@ $slike_result = $conn->query("
 ");
 $slike = $slike_result->fetch_all(MYSQLI_ASSOC);
 
-// Moje ocjene za ovu sesiju
 $moje_ocjene = [];
 if ($prijavljen) {
     $res = $conn->query("SELECT id_slika, ocjena FROM ocjene WHERE id_korisnik = {$_SESSION['user_id']}");
@@ -112,8 +108,8 @@ if ($prijavljen) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Filmbase – Galerija</title>
+    <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/style_slike.css">
-    <link rel="stylesheet" href="css/lv4.css">
 </head>
 <body>
 <header id="Naslov"><h1>Dobrodosli na moju web stranicu</h1></header>
@@ -122,10 +118,9 @@ if ($prijavljen) {
     <label for="check" class="checkbtn">☰</label>
     <div class="nav-links">
         <a href="index.php">Pocetna</a>
-        <a href="grafikon.html">Grafikon</a>
+        <a href="grafikon.php">Grafikon</a>
         <a href="galerija.php"><strong>Galerija</strong></a>
         <?php if ($prijavljen): ?>
-            <?php if ($je_admin): ?><a href="admin/dashboard.php">Admin</a><?php endif; ?>
             <a href="logout.php">Odjava (<?= htmlspecialchars($_SESSION['korisnicko_ime']) ?>)</a>
         <?php else: ?>
             <a href="login.php">Prijava</a>
@@ -138,8 +133,6 @@ if ($prijavljen) {
 
 <?= $poruka ?>
 
-
-<!-- ── LV4 Zadatak 2: Ocjenjivanje fotografija ─────────────────────── -->
 <section id="ocjenjivanje">
     <h1 style="text-align:center;margin-top:40px">⭐ OCJENJIVANJE FOTOGRAFIJA (LV4)</h1>
 
@@ -180,15 +173,19 @@ if ($prijavljen) {
             <?php if ($prijavljen): ?>
             <div class="ocjeni-forma">
                 <span>Vaša ocjena:</span>
-                <?php $moja = $moje_ocjene[$slika['id']] ?? 0; ?>
-                <?php for ($i = 1; $i <= 5; $i++): ?>
-                    <span class="zvjezdica-input <?= $i <= $moja ? 'odabrana' : '' ?>"
-                          data-slika="<?= $slika['id'] ?>"
-                          data-ocjena="<?= $i ?>"
-                          title="<?= $i ?> zvjezdic<?= $i === 1 ? 'a' : 'e' ?>">★</span>
-                <?php endfor; ?>
+                <div class="zvjezdice-wrapper" data-slika="<?= $slika['id'] ?>" data-odabrana="<?= $moje_ocjene[$slika['id']] ?? 0 ?>">
+                    <?php $moja = $moje_ocjene[$slika['id']] ?? 0; ?>
+                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                        <span class="zvjezdica-input <?= $i <= $moja ? 'odabrana' : '' ?>"
+                              data-slika="<?= $slika['id'] ?>"
+                              data-ocjena="<?= $i ?>"
+                              title="<?= $i ?> zvjezdic<?= $i === 1 ? 'a' : 'e' ?>">★</span>
+                    <?php endfor; ?>
+                </div>
                 <?php if ($moja): ?>
-                    <span class="moja-ocjena-tekst">Vaša ocjena: <?= $moja ?>/5</span>
+                    <span class="moja-ocjena-tekst" id="moja-ocjena-<?= $slika['id'] ?>">Vaša: <?= $moja ?>/5</span>
+                <?php else: ?>
+                    <span class="moja-ocjena-tekst" id="moja-ocjena-<?= $slika['id'] ?>"></span>
                 <?php endif; ?>
             </div>
             <?php endif; ?>
@@ -238,42 +235,74 @@ if ($prijavljen) {
 <footer><p>&copy; 2025. Web Programiranje. Sva prava pridrzana.</p></footer>
 
 <script>
-// Zvjezdice – hover i klik za ocjenjivanje
-document.querySelectorAll('.zvjezdica-input').forEach(zvj => {
-    zvj.addEventListener('mouseenter', function () {
-        const ocjena = parseInt(this.dataset.ocjena);
-        const slika  = this.dataset.slika;
-        document.querySelectorAll(`.zvjezdica-input[data-slika="${slika}"]`).forEach((z, i) => {
-            z.classList.toggle('hover', i < ocjena);
+// ── Zvjezdice – hover i klik za ocjenjivanje ─────────────────────────────
+document.querySelectorAll('.zvjezdice-wrapper').forEach(wrapper => {
+    const zvjezdice = wrapper.querySelectorAll('.zvjezdica-input');
+    const idSlike   = parseInt(wrapper.dataset.slika);
+    let odabrana    = parseInt(wrapper.dataset.odabrana) || 0;
+
+    function obojiDo(n, cssClass) {
+        zvjezdice.forEach((z, i) => {
+            z.classList.toggle(cssClass, i < n);
         });
-    });
+    }
 
-    zvj.addEventListener('mouseleave', function () {
-        const slika = this.dataset.slika;
-        document.querySelectorAll(`.zvjezdica-input[data-slika="${slika}"]`).forEach(z => {
-            z.classList.remove('hover');
+    zvjezdice.forEach((zvj, idx) => {
+        // Hover – privremeno oboji do hovered zvjezdice
+        zvj.addEventListener('mouseenter', () => {
+            // ukloni odabrana privremeno da hover bude čist
+            obojiDo(0, 'odabrana');
+            obojiDo(idx + 1, 'hover');
         });
-    });
 
-    zvj.addEventListener('click', async function () {
-        const ocjena  = parseInt(this.dataset.ocjena);
-        const id_slika = parseInt(this.dataset.slika);
+        // Kad miš izađe – vrati na odabranu
+        zvj.addEventListener('mouseleave', () => {
+            obojiDo(0, 'hover');
+            obojiDo(odabrana, 'odabrana');
+        });
 
-        const fd = new FormData();
-        fd.append('akcija', 'ocijeni');
-        fd.append('id_slika', id_slika);
-        fd.append('ocjena', ocjena);
+        // Klik – spremi ocjenu
+        zvj.addEventListener('click', async () => {
+            const novaOcjena = idx + 1;
+            odabrana = novaOcjena;
+            wrapper.dataset.odabrana = novaOcjena;
 
-        const res  = await fetch('galerija.php', { method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'} });
-        const data = await res.json();
+            // Odmah vizualno oboji
+            obojiDo(0, 'hover');
+            obojiDo(odabrana, 'odabrana');
 
-        // Ažuriraj prikaz prosječne ocjene
-        const avgEl = document.getElementById('avg-' + id_slika);
-        if (avgEl) avgEl.textContent = data.avg + ' / 5 (' + data.cnt + ' ocjena)';
+            // Pošalji AJAX
+            const fd = new FormData();
+            fd.append('akcija', 'ocijeni');
+            fd.append('id_slika', idSlike);
+            fd.append('ocjena', novaOcjena);
 
-        // Označi odabrane zvjezdice
-        document.querySelectorAll(`.zvjezdica-input[data-slika="${id_slika}"]`).forEach((z, i) => {
-            z.classList.toggle('odabrana', i < ocjena);
+            try {
+                const res  = await fetch('galerija.php', {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await res.json();
+
+                // Ažuriraj prikaz prosječne ocjene
+                const avgEl = document.getElementById('avg-' + idSlike);
+                if (avgEl) avgEl.textContent = data.avg + ' / 5 (' + data.cnt + ' ocjena)';
+
+                // Ažuriraj avg zvjezdice (readonly prikaz)
+                const kartica = document.getElementById('slika-' + idSlike);
+                const avgZvj  = kartica.querySelectorAll('.avg-ocjena .zvjezdica');
+                const rounded = Math.round(data.avg);
+                avgZvj.forEach((z, i) => {
+                    z.classList.toggle('puna', i < rounded);
+                });
+
+                // Prikaži tekst ocjene
+                const mojaEl = document.getElementById('moja-ocjena-' + idSlike);
+                if (mojaEl) mojaEl.textContent = 'Vaša: ' + novaOcjena + '/5';
+            } catch(e) {
+                console.error('Greška pri ocjenjivanju:', e);
+            }
         });
     });
 });
