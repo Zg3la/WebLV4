@@ -421,7 +421,7 @@ $stmt->close();
 
 <aside id="kosarica-aside">
     <button id="kosarica-tab" title="Otvori košaricu">
-        🎬
+        
         <span id="kosarica-badge">0</span>
     </button>
     <div id="kosarica-body">
@@ -432,7 +432,7 @@ $stmt->close();
     </div>
 </aside>
 
-<header id="Naslov"><h1>Dobrodosli na moju web stranicu</h1></header>
+<header id="Naslov"><h1>Filmbase</h1></header>
 <nav class="navbar">
     <input type="checkbox" id="check">
     <label for="check" class="checkbtn">☰</label>
@@ -452,7 +452,7 @@ $stmt->close();
 <main>
 
 <section id="filmovi-baza">
-    <h1 id="tablicatekst">🎬 FILMOVI IZ BAZE PODATAKA (LV4)</h1>
+    <h1 id="tablicatekst">FILMOVI</h1>
 
     <?= $upozorenje_niskocjena ?>
     <div id="upozorenje-posudba-kontejner"></div>
