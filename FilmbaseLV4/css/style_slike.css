@@ -178,12 +178,20 @@ th {
 }
 
 /* ================= ZVJEZDICE – OCJENJIVANJE ================= */
+.zvjezdice-wrapper {
+  display: inline-flex;
+  gap: 2px;
+  cursor: pointer;
+}
+
 .zvjezdica-input {
   color: #ccc;
   font-size: 24px;
   cursor: pointer;
-  transition: color 0.15s, transform 0.1s;
+  transition: color 0.05s, transform 0.05s;
   display: inline-block;
+  user-select: none;
+  pointer-events: none;   /* hover/click handled on wrapper */
 }
 
 .zvjezdica-input.odabrana {
@@ -192,7 +200,7 @@ th {
 
 .zvjezdica-input.hover {
   color: #f5c518;
-  transform: scale(1.2);
+  transform: scale(1.18);
 }
 
 .ocjeni-forma {
@@ -209,10 +217,6 @@ th {
   margin-right: 4px;
 }
 
-.zvjezdice-wrapper {
-  display: inline-flex;
-  gap: 2px;
-}
 
 .moja-ocjena-tekst {
   font-size: 13px;
